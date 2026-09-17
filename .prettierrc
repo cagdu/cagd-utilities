@@ -1,0 +1,11 @@
+{
+    "tabWidth": 4,
+    "useTabs": true,
+    "singleAttributePerLine": false,
+    "bracketSameLine": true,
+    "printWidth": 9999,
+    "htmlWhitespaceSensitivity": "ignore",
+    "singleQuote": false,
+    "bracketSpacing": true,
+    "embeddedLanguageFormatting": "off"
+}

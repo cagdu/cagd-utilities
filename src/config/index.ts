@@ -1,0 +1,2 @@
+export { config as data, config, configManager as manager, ConfigManager } from "./manager";
+export type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig } from "./types";
