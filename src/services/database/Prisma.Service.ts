@@ -123,12 +123,34 @@ export class PrismaService<TClient = any> {
 		if (!Ctor) throw new Error("PrismaService: PrismaClient bulunamadı. `PrismaService.register(PrismaClient)` ile kaydet ya da `config.database.prisma.clientPath` alanını ayarla.");
 
 		const clientOptions: Record<string, any> = { ...(PrismaService.options.clientOptions ?? {}) };
-		const adapter = PrismaService.options.disableAdapter ? null : PrismaService.createAdapter();
 
-		if (adapter) clientOptions.adapter = adapter;
-		else if (process.env.DATABASE_URL) clientOptions.datasources = { db: { url: process.env.DATABASE_URL } };
+		if (PrismaService.options.disableAdapter) {
+			// Adapter bilinçli olarak devre dışı: klasik (engine tabanlı) generated client,
+			// DATABASE_URL üzerinden bağlanır.
+			if (process.env.DATABASE_URL) clientOptions.datasourceUrl = process.env.DATABASE_URL;
+		} else {
+			const provider = PrismaService.getProvider();
+			const adapter = PrismaService.createAdapter();
 
-		log.debug(`PrismaService: client oluşturuluyor (provider: ${PrismaService.getProvider()}, adapter: ${adapter ? "aktif" : "pasif"})`);
+			if (!adapter) {
+				const pkg = provider === "mssql" ? "@prisma/adapter-mssql" : "@prisma/adapter-pg";
+				const driverPkg = provider === "mssql" ? "mssql" : "pg";
+				// NOT: driver adapter kullanan (schema.prisma'da `driverAdapters` preview feature'ı
+				// açık) generated client'lar SADECE `adapter` seçeneğini kabul eder; `datasources`/
+				// `datasourceUrl` ile sessizce devam etmek Prisma runtime'ında "Unknown property"
+				// hatasıyla çöker. Bu yüzden burada erken ve net bir hata fırlatılıyor.
+				throw new Error(
+					`PrismaService: '${pkg}' (ve '${driverPkg}') paketleri bulunamadı/yüklenemedi. ` +
+						`Kur: npm i ${pkg} ${driverPkg}. Adapter kullanmak istemiyorsan ` +
+						`PrismaService.register(PrismaClient, { disableAdapter: true }) ver ve DATABASE_URL tanımla ` +
+						`(sadece klasik/engine tabanlı generated client'larda çalışır).`,
+				);
+			}
+
+			clientOptions.adapter = adapter;
+		}
+
+		log.debug(`PrismaService: client oluşturuluyor (provider: ${PrismaService.getProvider()}, adapter: ${PrismaService.options.disableAdapter ? "pasif" : "aktif"})`);
 		return new Ctor(clientOptions);
 	}
 
@@ -148,20 +170,35 @@ export class PrismaService<TClient = any> {
 		return null;
 	}
 
+	/**
+	 * `null` dönüşü SADECE "paket yüklenemedi" (require başarısız) anlamına gelir.
+	 * Paket yüklenip adapter KURULURKEN (constructor) fırlayan hata BİLEREK
+	 * yutulmuyor/`null`a çevrilmiyor — aksi halde "paketler kurulu ama yine de
+	 * 'bulunamadı' hatası alıyorum" gibi yanıltıcı bir teşhise yol açar. O hata,
+	 * gerçek sebebiyle (yanlış config şekli, sürüm uyuşmazlığı vs.) olduğu gibi
+	 * yukarı fırlatılır.
+	 */
 	private static createAdapter(): any | null {
+		const provider = PrismaService.getProvider();
+		let AdapterCtor: new (poolConfig: any) => any;
+		let poolConfig: any;
+
 		try {
-			if (PrismaService.getProvider() === "mssql") {
+			if (provider === "mssql") {
 				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				const { PrismaMssql } = require("@prisma/adapter-mssql");
-				return new PrismaMssql(loadMssql().getPoolConfig());
+				AdapterCtor = require("@prisma/adapter-mssql").PrismaMssql;
+				poolConfig = loadMssql().getPoolConfig();
+			} else {
+				// eslint-disable-next-line @typescript-eslint/no-var-requires
+				AdapterCtor = require("@prisma/adapter-pg").PrismaPg;
+				poolConfig = loadPostgres().getPoolConfig();
 			}
-			// eslint-disable-next-line @typescript-eslint/no-var-requires
-			const { PrismaPg } = require("@prisma/adapter-pg");
-			return new PrismaPg(loadPostgres().getPoolConfig());
 		} catch (err) {
-			log.warn("PrismaService: adapter yüklenemedi, DATABASE_URL üzerinden bağlanılacak.", (err as Error)?.message);
+			log.debug("PrismaService: adapter paketi yüklenemedi.", (err as Error)?.message);
 			return null;
 		}
+
+		return new AdapterCtor(poolConfig);
 	}
 
 	// ------------------------------------------------------------------

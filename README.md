@@ -51,7 +51,9 @@ Sadece **kullandığın** servisin paketini kur. Gerisi opsiyonel:
 - **Prisma** sadece seçili provider'ın paketine bakar:
   - `provider: "mssql"` -> `pg` hiç aranmaz.
   - `provider: "postgres"` -> `mssql` hiç aranmaz.
-  - Adapter paketi kurulu değilse çökmez, uyarı verip `DATABASE_URL`'e düşer.
+  - Adapter paketi (`disableAdapter: true` verilmediyse) `require()` ile bulunamazsa, hangi paketleri (`@prisma/adapter-mssql`/`@prisma/adapter-pg` + `mssql`/`pg`) kurman gerektiğini söyleyen net bir hata fırlatır — Prisma'nın derin ve okunması zor "Unknown property" hatasına düşmeden.
+  - Bu hatayı paketler KURULU olmasına rağmen görüyorsan sebep "paket eksik" değildir: `require()` başka bir yerde (yanlış path, monorepo hoisting, bun/pnpm çözümleme farkı vb.) başarısız oluyordur. Adapter paketi bulunup da constructor'ı başka bir sebeple patlarsa (örn. yanlış config şekli) o hata OLDUĞU GİBİ fırlatılır, "paket bulunamadı" mesajıyla ÖRTÜLMEZ.
+  - `disableAdapter: true` verirsen adapter hiç aranmaz, `DATABASE_URL` üzerinden (klasik/engine tabanlı generated client'larda) bağlanılır.
 
 ### Yerel geliştirme
 
@@ -61,6 +63,18 @@ npm run build && npm link
 # api ve agent projelerinde
 npm link cagd-utilities
 ```
+
+> **`npm link`/`bun link` + opsiyonel paket tuzağı:** `link` bir symlink oluşturur; Node/Bun
+> `require()` çağrısını, requiring dosyanın **gerçek (symlink çözülmüş) yolundan** yukarı doğru
+> arar — tüketici projenin `node_modules`'ına DEĞİL. Yani `service.prisma` (mssql/postgres adapter'ı
+> lazy require eden kod) tüketici projede `link` ile bağlıysa, `@prisma/adapter-mssql` tüketici
+> projede kurulu olsa bile "Cannot find module" hatası alırsın — çünkü arama bu deponun
+> (`cagd-utilities`) kendi dizininden yukarı doğru yapılır, tüketicinin `node_modules`'ından değil.
+> Bu yüzden bu depo, `mssql`/`pg`/`redis`/`express` gibi opsiyonel paketleri (ve artık
+> `@prisma/client` + `@prisma/adapter-mssql` + `@prisma/adapter-pg`'yi) **kendi `devDependencies`'inde**
+> de tutuyor — `link` ile geliştirirken bu hatayı yaşamamak için. Gerçek (registry) `npm install`
+> ile kurulumda bu sorun hiç yaşanmaz (paket tüketicinin `node_modules`'ının içinde yer aldığı için
+> yukarı arama zaten oraya çıkar).
 
 ---
 

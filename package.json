@@ -74,6 +74,7 @@
   "peerDependencies": {
     "@prisma/adapter-mssql": "*",
     "@prisma/adapter-pg": "*",
+    "@prisma/client": "*",
     "axios": ">=1",
     "cagd-log": "*",
     "cors": ">=2",
@@ -90,6 +91,9 @@
       "optional": true
     },
     "@prisma/adapter-pg": {
+      "optional": true
+    },
+    "@prisma/client": {
       "optional": true
     },
     "axios": {
@@ -124,6 +128,9 @@
     }
   },
   "devDependencies": {
+    "@prisma/adapter-mssql": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/mssql": "^12.3.0",
