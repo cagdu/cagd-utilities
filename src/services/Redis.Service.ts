@@ -1,18 +1,18 @@
 import { createClient, type RedisClientType } from "redis";
 
 import { config } from "../config";
-import { log } from "../utils/logger";
+import { log } from "../util/logger";
 
-export class Redis_Service {
-	private static instance: Redis_Service | null = null;
+export class RedisService {
+	private static instance: RedisService | null = null;
 	private static client: RedisClientType | null = null;
 	private static isConnected = false;
 
 	private constructor() {
-		if (!Redis_Service.client) {
+		if (!RedisService.client) {
 			const cfg = (config as any)?.services?.redis ?? {};
 
-			Redis_Service.client = createClient({
+			RedisService.client = createClient({
 				url: cfg.url || process.env.REDIS_URL || `redis://${cfg.host || process.env.REDIS_HOST || "localhost"}:${cfg.port || process.env.REDIS_PORT || 6379}`,
 				password: cfg.password || process.env.REDIS_PASSWORD || undefined,
 				database: cfg.db ?? (process.env.REDIS_DB ? Number(process.env.REDIS_DB) : 0),
@@ -21,35 +21,35 @@ export class Redis_Service {
 				},
 			}) as RedisClientType;
 
-			Redis_Service.client.on("error", err => log.error("Redis_Service", err));
-			Redis_Service.client.on("ready", () => (Redis_Service.isConnected = true));
-			Redis_Service.client.on("end", () => (Redis_Service.isConnected = false));
+			RedisService.client.on("error", err => log.error("RedisService", err));
+			RedisService.client.on("ready", () => (RedisService.isConnected = true));
+			RedisService.client.on("end", () => (RedisService.isConnected = false));
 		}
 	}
 
-	public static getInstance(): Redis_Service {
-		if (!Redis_Service.instance) Redis_Service.instance = new Redis_Service();
-		return Redis_Service.instance;
+	public static getInstance(): RedisService {
+		if (!RedisService.instance) RedisService.instance = new RedisService();
+		return RedisService.instance;
 	}
 
 	public get client(): RedisClientType {
-		if (!Redis_Service.client) throw new Error("Redis client is not initialized");
-		return Redis_Service.client;
+		if (!RedisService.client) throw new Error("Redis client is not initialized");
+		return RedisService.client;
 	}
 
 	public get connected(): boolean {
-		return Redis_Service.isConnected;
+		return RedisService.isConnected;
 	}
 
 	async connect(): Promise<void> {
-		if (Redis_Service.client && !Redis_Service.isConnected) await Redis_Service.client.connect();
+		if (RedisService.client && !RedisService.isConnected) await RedisService.client.connect();
 	}
 
 	async healthCheck(): Promise<boolean> {
 		try {
 			return (await this.client.ping()) === "PONG";
 		} catch (err) {
-			log.error("Redis_Service: healthCheck failed.", err);
+			log.error("RedisService: healthCheck başarısız.", err);
 			return false;
 		}
 	}
@@ -96,14 +96,14 @@ export class Redis_Service {
 	}
 
 	async close(): Promise<void> {
-		if (Redis_Service.client) {
-			if (Redis_Service.isConnected) await Redis_Service.client.quit();
-			Redis_Service.client = null;
-			Redis_Service.instance = null;
-			Redis_Service.isConnected = false;
+		if (RedisService.client) {
+			if (RedisService.isConnected) await RedisService.client.quit();
+			RedisService.client = null;
+			RedisService.instance = null;
+			RedisService.isConnected = false;
 			log.info("Redis client closed");
 		}
 	}
 }
 
-export default Redis_Service;
+export default RedisService;

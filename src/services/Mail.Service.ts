@@ -2,17 +2,21 @@ import nodemailer, { type Transporter } from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 
 import { config } from "../config";
-import { log } from "../utils/logger";
+import { log } from "../util/logger";
 
-export class Mail_Service {
-	private static instance: Mail_Service | null = null;
+/**
+ * SMTP ayarları önce `config.services.mail`, yoksa process.env üzerinden okunur.
+ * Transporter lazy oluşturulur; import edilmesi tek başına bağlantı açmaz.
+ */
+export class MailService {
+	private static instance: MailService | null = null;
 	private static transporter: Transporter<SMTPTransport.SentMessageInfo> | null = null;
 
 	private constructor() {}
 
-	public static getInstance(): Mail_Service {
-		if (!Mail_Service.instance) Mail_Service.instance = new Mail_Service();
-		return Mail_Service.instance;
+	public static getInstance(): MailService {
+		if (!MailService.instance) MailService.instance = new MailService();
+		return MailService.instance;
 	}
 
 	public static getOptions(): SMTPTransport.Options & { pool: boolean } {
@@ -32,8 +36,8 @@ export class Mail_Service {
 	}
 
 	public get transporter(): Transporter<SMTPTransport.SentMessageInfo> {
-		if (!Mail_Service.transporter) Mail_Service.transporter = nodemailer.createTransport(Mail_Service.getOptions());
-		return Mail_Service.transporter;
+		if (!MailService.transporter) MailService.transporter = nodemailer.createTransport(MailService.getOptions());
+		return MailService.transporter;
 	}
 
 	async healthCheck(): Promise<boolean> {
@@ -41,7 +45,7 @@ export class Mail_Service {
 			await this.transporter.verify();
 			return true;
 		} catch (err) {
-			log.error("Mail_Service: verify failed.", err);
+			log.error("MailService: verify başarısız.", err);
 			return false;
 		}
 	}
@@ -52,13 +56,13 @@ export class Mail_Service {
 	}
 
 	async close(): Promise<void> {
-		if (Mail_Service.transporter) {
-			Mail_Service.transporter.close();
-			Mail_Service.transporter = null;
-			Mail_Service.instance = null;
+		if (MailService.transporter) {
+			MailService.transporter.close();
+			MailService.transporter = null;
+			MailService.instance = null;
 			log.info("Mail transporter closed");
 		}
 	}
 }
 
-export default Mail_Service;
+export default MailService;

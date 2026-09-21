@@ -3,8 +3,8 @@
  *
  * NOT 1: getInstance() burada YOK. Static metodlar TypeScript interface'lerinde
  * zorunlu kılınamaz (her sınıf singleton'ını kendi static getInstance()'ı ile
- * yönetir, bkz. Postgres_Service / MSSQL_Service). Yeni bir servis eklerken
- * bu deseni Implement.Service.ts referans alarak kopyala.
+ * yönetir, bkz. PostgresService / MssqlService). Yeni bir servis eklerken
+ * bu deseni _template.Service.ts referans alarak kopyala.
  *
  * NOT 2: queryWithMeta'nın dönüş tipi generic `TMeta` olarak bırakıldı.
  * Sebep: pg'nin QueryResult<T> ile mssql'in IResult<T> tipleri birbirinden

@@ -2,11 +2,24 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseJsonc, type ParseError } from "jsonc-parser";
 
-import { log } from "../utils/logger";
+import { log } from "../util/logger";
 import { deepClone, deepMerge, isPlainObject } from "./deep-merge";
 import { buildConfigJsonc } from "./jsonc-writer";
 import type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig } from "./types";
 
+/**
+ * ============================================================
+ *  CONFIG MANAGER
+ * ============================================================
+ * Tek bir modül seviyesinde (singleton) config deposu tutar.
+ *
+ *  - setDefaultConfig(defaults, options?) : varsayılanları tanımlar, varsa
+ *    config.jsonc dosyasını okuyup merge eder ve TAM TİPLİ bir API döner.
+ *  - setConfig(partial)                  : runtime'da config'i günceller.
+ *    Reboot gerekmez; `config` proxy'si her okumada güncel değeri verir.
+ *  - config                              : canlı (live) proxy. Referansı
+ *    değişmez, ama içeriği her zaman günceldir.
+ */
 export class ConfigManager {
 	private defaults: Record<string, any> = {};
 	private current: Record<string, any> = {};
@@ -20,6 +33,7 @@ export class ConfigManager {
 	private listeners = new Set<ConfigChangeListener<any>>();
 	private initialized = false;
 
+	/** Referansı hiç değişmeyen, içeriği daima güncel olan proxy. */
 	public readonly proxy: ResolvedConfig = new Proxy({} as Record<string, any>, {
 		get: (_t, prop: string | symbol) => {
 			if (prop === "toJSON") return () => deepClone(this.current);
@@ -34,11 +48,7 @@ export class ConfigManager {
 		ownKeys: () => Reflect.ownKeys(this.current),
 		getOwnPropertyDescriptor: (_t, prop) => {
 			if (!(prop in this.current)) return undefined;
-			return {
-				configurable: true,
-				enumerable: true,
-				value: this.current[prop as string],
-			};
+			return { configurable: true, enumerable: true, value: this.current[prop as string] };
 		},
 		deleteProperty: (_t, prop) => {
 			delete this.current[prop as string];
@@ -47,6 +57,9 @@ export class ConfigManager {
 		},
 	}) as ResolvedConfig;
 
+	// ------------------------------------------------------------------
+	// Yol (path) hesaplama
+	// ------------------------------------------------------------------
 	public configPath(): string {
 		return path.normalize(path.join(this.options.cwd, this.options.fileName));
 	}
@@ -55,8 +68,11 @@ export class ConfigManager {
 		return this.initialized;
 	}
 
+	// ------------------------------------------------------------------
+	// Varsayılanları tanımla
+	// ------------------------------------------------------------------
 	public setDefaultConfig<T extends Record<string, any>>(defaults: T, options: ConfigInitOptions<T> = {}): T {
-		if (!isPlainObject(defaults)) throw new TypeError("setDefaultConfig(): 'defaults' must be object.");
+		if (!isPlainObject(defaults)) throw new TypeError("setDefaultConfig(): 'defaults' bir obje olmalıdır.");
 
 		this.defaults = deepClone(defaults);
 		this.schema = (options.schema as Record<string, any>) ?? this.schema;
@@ -67,6 +83,7 @@ export class ConfigManager {
 		if (options.writeBack !== undefined) this.options.writeBack = options.writeBack;
 		if (options.header !== undefined) this.options.header = options.header;
 
+		// Daha önce setConfig ile verilmiş değerler varsa korunur.
 		const previous = this.initialized ? this.current : {};
 		this.current = deepMerge(this.defaults, previous);
 
@@ -78,12 +95,16 @@ export class ConfigManager {
 		return this.proxy as unknown as T;
 	}
 
+	/** Sadece varsayılan objeyi döner (kopya). */
 	public getDefaultConfig<T = ResolvedConfig>(): T {
 		return deepClone(this.defaults) as T;
 	}
 
+	// ------------------------------------------------------------------
+	// Runtime güncelleme
+	// ------------------------------------------------------------------
 	public setConfig<T extends Record<string, any> = ResolvedConfig>(partial: DeepPartial<T> | Record<string, any>, persist = false): T {
-		if (!isPlainObject(partial)) throw new TypeError("setConfig(): 'partial' must be object.");
+		if (!isPlainObject(partial)) throw new TypeError("setConfig(): 'partial' bir obje olmalıdır.");
 
 		this.current = deepMerge(this.current, partial);
 		this.emit();
@@ -93,6 +114,7 @@ export class ConfigManager {
 		return this.proxy as unknown as T;
 	}
 
+	/** Config'i varsayılanlara (ve istenirse dosyaya) geri döndürür. */
 	public resetConfig(reloadFile = true): ResolvedConfig {
 		this.current = deepClone(this.defaults);
 		if (reloadFile && this.options.useFile) this.current = deepMerge(this.current, this.readFile());
@@ -100,10 +122,12 @@ export class ConfigManager {
 		return this.proxy;
 	}
 
+	/** Anlık config'in düz (proxy olmayan) kopyası. */
 	public snapshot<T = ResolvedConfig>(): T {
 		return deepClone(this.current) as T;
 	}
 
+	/** Config her değiştiğinde tetiklenir. Abonelikten çıkmak için dönen fonksiyonu çağır. */
 	public onChange<T = ResolvedConfig>(listener: ConfigChangeListener<T>): () => void {
 		this.listeners.add(listener as ConfigChangeListener<any>);
 		return () => this.listeners.delete(listener as ConfigChangeListener<any>);
@@ -114,11 +138,14 @@ export class ConfigManager {
 			try {
 				listener(this.proxy);
 			} catch (err) {
-				log.error("ConfigManager: onChange listener error:", err);
+				log.error("ConfigManager: onChange listener hata verdi:", err);
 			}
 		}
 	}
 
+	// ------------------------------------------------------------------
+	// Dosya işlemleri (config.jsonc)
+	// ------------------------------------------------------------------
 	private readFile(): Record<string, any> {
 		const cnfPath = this.configPath();
 
@@ -131,10 +158,7 @@ export class ConfigManager {
 		try {
 			const raw = fs.readFileSync(cnfPath, { encoding: "utf8" });
 			const parseErrors: ParseError[] = [];
-			const parsed = parseJsonc(raw, parseErrors, {
-				allowTrailingComma: true,
-				disallowComments: false,
-			});
+			const parsed = parseJsonc(raw, parseErrors, { allowTrailingComma: true, disallowComments: false });
 
 			if (parseErrors.length > 0) {
 				log.error(`Error(s) parsing ${cnfPath}. Falling back to default config for this run:`, parseErrors);
@@ -143,6 +167,7 @@ export class ConfigManager {
 
 			if (!isPlainObject(parsed)) return {};
 
+			// Eksik alan var mı? Varsa dosyayı tamamla (yorumları koruyarak yeniden üret).
 			if (this.options.writeBack) {
 				const merged = deepMerge(this.defaults, parsed);
 				if (JSON.stringify(parsed) !== JSON.stringify(merged)) {
@@ -171,6 +196,7 @@ export class ConfigManager {
 		}
 	}
 
+	/** Dosyayı yeniden okuyup config'i günceller (hot reload). */
 	public reloadFile(): ResolvedConfig {
 		if (!this.options.useFile) return this.proxy;
 		this.current = deepMerge(this.current, this.readFile());
@@ -178,6 +204,7 @@ export class ConfigManager {
 		return this.proxy;
 	}
 
+	/** config.jsonc dosyasını izler; değiştiğinde config otomatik güncellenir. */
 	public watchFile(): () => void {
 		const cnfPath = this.configPath();
 		if (!fs.existsSync(cnfPath)) return () => {};
@@ -210,6 +237,8 @@ export class ConfigManager {
 }
 
 export const configManager = new ConfigManager();
+
+/** Canlı config proxy'si. Referansı değişmez, içeriği daima günceldir. */
 export const config: ResolvedConfig = configManager.proxy;
 
 export type { ConfigInitOptions, ConfigSchema, DeepPartial };

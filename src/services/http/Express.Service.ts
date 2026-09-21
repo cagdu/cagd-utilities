@@ -6,8 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { config } from "../../config";
-import { log } from "../../utils/logger";
-import { responserMiddleware } from "../../http/Response";
+import { log } from "../../util/logger";
+import { responserMiddleware } from "../../util/http/Response";
 
 export interface ExpressAppOptions {
 	/** Uygulamaya bağlanacak router(lar). */

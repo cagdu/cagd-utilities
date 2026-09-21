@@ -1,29 +1,29 @@
 import { Pool, type PoolClient, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
 
 import { config } from "../../config";
-import { log } from "../../utils/logger";
+import { log } from "../../util/logger";
 import { BaseService } from "./Base.Service";
 
-export class Postgres_Service extends BaseService<QueryResult> {
-	private static instance: Postgres_Service | null = null;
+export class PostgresService extends BaseService<QueryResult> {
+	private static instance: PostgresService | null = null;
 	private static pool: Pool | null = null;
 
 	private constructor() {
 		super();
-		if (!Postgres_Service.pool) {
-			Postgres_Service.pool = new Pool(Postgres_Service.getPoolConfig());
-			Postgres_Service.pool.on("error", err => log.error("Postgres_Service: unexpected error on idle client", err));
+		if (!PostgresService.pool) {
+			PostgresService.pool = new Pool(PostgresService.getPoolConfig());
+			PostgresService.pool.on("error", err => log.error("PostgresService: unexpected error on idle client", err));
 		}
 	}
 
-	public static getInstance(): Postgres_Service {
-		if (!Postgres_Service.instance) Postgres_Service.instance = new Postgres_Service();
-		return Postgres_Service.instance;
+	public static getInstance(): PostgresService {
+		if (!PostgresService.instance) PostgresService.instance = new PostgresService();
+		return PostgresService.instance;
 	}
 
 	private getPool(): Pool {
-		if (!Postgres_Service.pool) throw new Error("Postgres pool is not initialized");
-		return Postgres_Service.pool;
+		if (!PostgresService.pool) throw new Error("Postgres pool is not initialized");
+		return PostgresService.pool;
 	}
 
 	public static getPoolConfig(): PoolConfig {
@@ -47,7 +47,7 @@ export class Postgres_Service extends BaseService<QueryResult> {
 
 	/** BaseService instance metodu istediği için static getPoolConfig()'e köprü. */
 	getPoolConfig(): PoolConfig {
-		return Postgres_Service.getPoolConfig();
+		return PostgresService.getPoolConfig();
 	}
 
 	/** Tek seferlik sorgular için. Bağlantıyı otomatik alır ve bırakır. */
@@ -93,13 +93,13 @@ export class Postgres_Service extends BaseService<QueryResult> {
 
 	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. */
 	async close(): Promise<void> {
-		if (Postgres_Service.pool) {
-			await Postgres_Service.pool.end();
-			Postgres_Service.pool = null;
-			Postgres_Service.instance = null;
+		if (PostgresService.pool) {
+			await PostgresService.pool.end();
+			PostgresService.pool = null;
+			PostgresService.instance = null;
 			log.info("PostgreSQL pool closed");
 		}
 	}
 }
 
-export default Postgres_Service;
+export default PostgresService;

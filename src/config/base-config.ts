@@ -1,5 +1,18 @@
 import type { ConfigSchema } from "./types";
 
+/**
+ * Paketin kendi servislerinin (database, web, axios, redis, mail) ihtiyaç duyduğu
+ * TEMEL config iskeleti. Tüketici proje kendi alanlarını buna ekleyerek kullanır:
+ *
+ *   import utilities, { baseConfig, baseConfigSchema } from "cagd-utilities";
+ *
+ *   const defaultConfig = {
+ *       ...baseConfig,
+ *       myFeature: { enabled: true },
+ *   };
+ *
+ *   export const config = utilities.setDefaultConfig(defaultConfig, { schema: baseConfigSchema });
+ */
 export const baseConfig = {
 	dev: true,
 	debug: [] as string[],
@@ -89,7 +102,7 @@ export type BaseConfig = typeof baseConfig;
 /** config.jsonc yorum satırlarını üreten açıklama şeması. */
 export const baseConfigSchema: ConfigSchema<BaseConfig> = {
 	dev: "Uygulamanın geliştirme (development) modunda çalışıp çalışmadığı",
-	debug: "Hata ayıklama (debug) etiketleri. Örn: [\"Axios_Service\"] ya da [\"*\"]",
+	debug: "Hata ayıklama (debug) etiketleri. Örn: [\"AxiosService\"] ya da [\"*\"] (hepsi)",
 	database: {
 		__self: "Veritabanı yapılandırması",
 		provider: "Kullanılacak veritabanı: \"postgres\" veya \"mssql\"",

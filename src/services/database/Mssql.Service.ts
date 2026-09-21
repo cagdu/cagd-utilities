@@ -1,11 +1,11 @@
 import sql, { type ConnectionPool, type Request, type Transaction, type config as MssqlConfig } from "mssql";
 
 import { config } from "../../config";
-import { log } from "../../utils/logger";
+import { log } from "../../util/logger";
 import { BaseService } from "./Base.Service";
 
-export class MSSQL_Service extends BaseService<sql.IResult<any>> {
-	private static instance: MSSQL_Service | null = null;
+export class MssqlService extends BaseService<sql.IResult<any>> {
+	private static instance: MssqlService | null = null;
 	private static pool: ConnectionPool | null = null;
 	private static connecting: Promise<ConnectionPool> | null = null;
 
@@ -13,9 +13,9 @@ export class MSSQL_Service extends BaseService<sql.IResult<any>> {
 		super();
 	}
 
-	public static getInstance(): MSSQL_Service {
-		if (!MSSQL_Service.instance) MSSQL_Service.instance = new MSSQL_Service();
-		return MSSQL_Service.instance;
+	public static getInstance(): MssqlService {
+		if (!MssqlService.instance) MssqlService.instance = new MssqlService();
+		return MssqlService.instance;
 	}
 
 	/**
@@ -23,22 +23,22 @@ export class MSSQL_Service extends BaseService<sql.IResult<any>> {
 	 * new Pool() yeterli değil), bu yüzden pool'u lazy + tek seferlik kuruyoruz.
 	 */
 	private async getPool(): Promise<ConnectionPool> {
-		if (MSSQL_Service.pool?.connected) return MSSQL_Service.pool;
+		if (MssqlService.pool?.connected) return MssqlService.pool;
 
-		if (!MSSQL_Service.connecting) {
-			MSSQL_Service.connecting = new sql.ConnectionPool(MSSQL_Service.getPoolConfig())
+		if (!MssqlService.connecting) {
+			MssqlService.connecting = new sql.ConnectionPool(MssqlService.getPoolConfig())
 				.connect()
 				.then(pool => {
-					pool.on("error", err => log.error("MSSQL_Service: unexpected error on idle client", err));
-					MSSQL_Service.pool = pool;
+					pool.on("error", err => log.error("MssqlService: unexpected error on idle client", err));
+					MssqlService.pool = pool;
 					return pool;
 				})
 				.finally(() => {
-					MSSQL_Service.connecting = null;
+					MssqlService.connecting = null;
 				});
 		}
 
-		return MSSQL_Service.connecting;
+		return MssqlService.connecting;
 	}
 
 	public static getPoolConfig(): MssqlConfig {
@@ -65,7 +65,7 @@ export class MSSQL_Service extends BaseService<sql.IResult<any>> {
 
 	/** BaseService instance metodu istediği için static getPoolConfig()'e köprü. */
 	getPoolConfig(): MssqlConfig {
-		return MSSQL_Service.getPoolConfig();
+		return MssqlService.getPoolConfig();
 	}
 
 	/**
@@ -125,11 +125,11 @@ export class MSSQL_Service extends BaseService<sql.IResult<any>> {
 
 	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. */
 	async close(): Promise<void> {
-		if (MSSQL_Service.pool) {
-			await MSSQL_Service.pool.close();
-			MSSQL_Service.pool = null;
-			MSSQL_Service.instance = null;
-			log.info("MSSQL pool closed");
+		if (MssqlService.pool) {
+			await MssqlService.pool.close();
+			MssqlService.pool = null;
+			MssqlService.instance = null;
+			log.info("Mssql pool closed");
 		}
 	}
 
@@ -142,4 +142,4 @@ export class MSSQL_Service extends BaseService<sql.IResult<any>> {
 	}
 }
 
-export default MSSQL_Service;
+export default MssqlService;

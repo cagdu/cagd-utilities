@@ -1,6 +1,6 @@
 /**
- * Uses `cagd-log` if available; otherwise, falls back to the console.
- * This ensures the package works even in projects where `cagd-log` is not installed.
+ * `cagd-log` varsa onu kullanır, yoksa console'a düşer.
+ * Böylece paket, cagd-log kurulu olmayan bir projede de çalışır.
  */
 export interface Logger {
 	info: (...args: any[]) => void;
@@ -30,7 +30,7 @@ function resolveLogger(): Logger {
 			};
 		}
 	} catch {
-		/* cagd-log not found */
+		/* cagd-log kurulu değil */
 	}
 	return consoleLogger;
 }

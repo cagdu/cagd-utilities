@@ -1,5 +1,11 @@
 export const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/**
+ * `defaults` iskeletini korur, `source` içindeki değerlerle üzerine yazar.
+ * - Diziler değiştirilir (merge edilmez).
+ * - `source` içindeki fazladan anahtarlar korunur.
+ * - Hiçbir girdiyi mutasyona uğratmaz.
+ */
 export function deepMerge<T>(defaults: T, source: unknown): T {
 	if (!isPlainObject(defaults) || !isPlainObject(source)) return source === undefined ? defaults : (source as T);
 
@@ -21,6 +27,7 @@ export function deepMerge<T>(defaults: T, source: unknown): T {
 	return result as T;
 }
 
+/** Basit derin kopya (JSON uyumlu config objeleri için yeterli). */
 export function deepClone<T>(value: T): T {
 	if (Array.isArray(value)) return value.map(v => deepClone(v)) as unknown as T;
 	if (isPlainObject(value)) {

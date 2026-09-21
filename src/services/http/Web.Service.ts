@@ -5,17 +5,18 @@ import path from "node:path";
 import type { RequestListener } from "node:http";
 
 import { config } from "../../config";
-import { log } from "../../utils/logger";
+import { log } from "../../util/logger";
 import { createExpressApp, type ExpressAppOptions } from "./Express.Service";
 
 export interface WebServiceOptions extends ExpressAppOptions {
+	/** Hazır bir Express (veya herhangi bir RequestListener) uygulaması. Verilmezse createExpressApp() kullanılır. */
 	app?: RequestListener;
 	host?: string;
 	port?: number;
 }
 
-export class WEB_Service {
-	private static instance: WEB_Service | null = null;
+export class WebService {
+	private static instance: WebService | null = null;
 	private server: HttpServer | HttpsServer;
 	private options: WebServiceOptions;
 
@@ -34,14 +35,14 @@ export class WEB_Service {
 		this.server.on("error", WebServerErrorHandler);
 	}
 
-	public static getInstance(options?: WebServiceOptions): WEB_Service {
-		if (!WEB_Service.instance) WEB_Service.instance = new WEB_Service(options);
-		return WEB_Service.instance;
+	public static getInstance(options?: WebServiceOptions): WebService {
+		if (!WebService.instance) WebService.instance = new WebService(options);
+		return WebService.instance;
 	}
 
 	/** Router'ları vs. değiştirip sunucuyu yeniden kurmak için. */
 	public static reset(): void {
-		WEB_Service.instance = null;
+		WebService.instance = null;
 	}
 
 	getServer(): HttpServer | HttpsServer {
@@ -56,7 +57,7 @@ export class WEB_Service {
 		return this.options.port ?? (config as any)?.services?.web?.port ?? 31443;
 	}
 
-	async Start(): Promise<void> {
+	async start(): Promise<void> {
 		const secure = (config as any)?.services?.web?.secure?.enabled ? "s" : "";
 		return new Promise<void>(resolve =>
 			this.server.listen({ host: this.host, port: this.port }, () => {
@@ -66,12 +67,12 @@ export class WEB_Service {
 		);
 	}
 
-	async Stop(): Promise<void> {
+	async stop(): Promise<void> {
 		return new Promise<void>((resolve, reject) => this.server.close(err => (err ? reject(err) : resolve())));
 	}
 }
 
-export default WEB_Service;
+export default WebService;
 
 function WebServerErrorHandler(err: Error) {
 	log.error("Web Server Error:", err);

@@ -1,1 +1,1 @@
-import { config, util, http, services } from "..";
+import utilities from "../dist";
