@@ -22,7 +22,7 @@ export class RedisService {
 			}) as RedisClientType;
 
 			RedisService.client.on("error", err => log.error("RedisService", err));
-			RedisService.client.on("ready", () => (RedisService.isConnected = true));
+			RedisService.client.on("ready", () => { log.info(`RedisService: Is connected. (${cfg.host})`); RedisService.isConnected = true; });
 			RedisService.client.on("end", () => (RedisService.isConnected = false));
 		}
 	}

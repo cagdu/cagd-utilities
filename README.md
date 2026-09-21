@@ -70,9 +70,11 @@ npm link cagd-utilities
 > lazy require eden kod) tüketici projede `link` ile bağlıysa, `@prisma/adapter-mssql` tüketici
 > projede kurulu olsa bile "Cannot find module" hatası alırsın — çünkü arama bu deponun
 > (`cagd-utilities`) kendi dizininden yukarı doğru yapılır, tüketicinin `node_modules`'ından değil.
+> Aynı durum `util/logger.ts`'in `require("cagd-log")` çağrısı için de geçerli: `cagd-log` tüketici
+> projede kurulu olsa bile, `link` ile bağlıysan bulunamaz ve sessizce `console`'a düşer.
 > Bu yüzden bu depo, `mssql`/`pg`/`redis`/`express` gibi opsiyonel paketleri (ve artık
-> `@prisma/client` + `@prisma/adapter-mssql` + `@prisma/adapter-pg`'yi) **kendi `devDependencies`'inde**
-> de tutuyor — `link` ile geliştirirken bu hatayı yaşamamak için. Gerçek (registry) `npm install`
+> `@prisma/client` + `@prisma/adapter-mssql` + `@prisma/adapter-pg` + `cagd-log`'u) **kendi
+> `devDependencies`'inde** de tutuyor — `link` ile geliştirirken bu hatayı yaşamamak için. Gerçek (registry) `npm install`
 > ile kurulumda bu sorun hiç yaşanmaz (paket tüketicinin `node_modules`'ının içinde yer aldığı için
 > yukarı arama zaten oraya çıkar).
 

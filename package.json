@@ -128,7 +128,7 @@
     }
   },
   "devDependencies": {
-    "@prisma/adapter-mssql": "7.10.0",
+    "@prisma/adapter-mssql": "^7.10.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@types/cors": "^2.8.17",
@@ -138,11 +138,12 @@
     "@types/nodemailer": "^6.4.15",
     "@types/pg": "^8.11.10",
     "axios": "^1.7.7",
+    "cagd-log": "1.1.0",
     "cors": "^2.8.5",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
     "helmet": "^8.0.0",
-    "mssql": "^11.0.1",
+    "mssql": "^12.7.2",
     "nodemailer": "^6.9.15",
     "pg": "^8.13.1",
     "redis": "^4.7.0",

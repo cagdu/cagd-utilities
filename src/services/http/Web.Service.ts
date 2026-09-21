@@ -61,7 +61,7 @@ export class WebService {
 		const secure = (config as any)?.services?.web?.secure?.enabled ? "s" : "";
 		return new Promise<void>(resolve =>
 			this.server.listen({ host: this.host, port: this.port }, () => {
-				log.info(`Web Service running at http${secure}://${this.host}:${this.port}/ (${JSON.stringify(this.server.address())})`);
+				log.info(`WebService: Running at http${secure}://${this.host}:${this.port}/ (${JSON.stringify(this.server.address())})`);
 				resolve();
 			}),
 		);
