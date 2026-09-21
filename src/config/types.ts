@@ -45,8 +45,15 @@ export interface ConfigInitOptions<T> {
 	useFile?: boolean;
 	/** Eksik alanlar dosyaya geri yazılsın mı? Varsayılan: true */
 	writeBack?: boolean;
-	/** JSONC yorum satırlarını üreten açıklama şeması. */
-	schema?: ConfigSchema<T>;
+	/**
+	 * JSONC yorum satırlarını üreten açıklama şeması.
+	 * `NoInfer`: bu alan T'yi ÇIKARSAMAK için kullanılmasın — sadece
+	 * `defaults` argümanından çıkarılan T'ye karşı kontrol edilsin.
+	 * Aksi halde örn. `baseConfigSchema` (yalnızca ortak alanları kapsayan,
+	 * daha dar bir şema) T'yi daraltıp tüketicinin eklediği kendi alanlarını
+	 * (örn. `app`) dönen tipten düşürebilir.
+	 */
+	schema?: ConfigSchema<NoInfer<T>>;
 	/** Dosya oluşturulurken en üste eklenecek yorum satırları. */
 	header?: string[];
 }

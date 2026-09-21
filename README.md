@@ -117,6 +117,8 @@ config.manager.setConfig({ dev: false }, true); // true => config.jsonc dosyası
 
 `config.data` bir Proxy'dir: referansı hiç değişmez, her okumada güncel değeri verir.
 
+> **Debug tuzağı:** `console.log(config.data)` / `console.dir(config.data)` her zaman `Proxy({})` gösterir — Node, Proxy'leri basarken varsayılan olarak (`showProxy: false`) trap'leri hiç çalıştırmadan iç `target`'ı basar, bu kütüphaneden bağımsız bir Node davranışıdır. Gerçek veriyi görmek için `config.manager.getConfig()`, `JSON.stringify(config.data)` veya `console.log(config.data.somePath)` kullan.
+
 > **Eski kısayol:** `config.services.web.port` hâlâ çalışır ama ileride kalkacak. Yeni kodda `config.data` kullan.
 
 ### `config.manager` API'si
