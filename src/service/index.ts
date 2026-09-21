@@ -32,7 +32,7 @@ import type MssqlService from "../services/database/Mssql.Service";
 import type MailService from "../services/Mail.Service";
 import type PostgresService from "../services/database/Postgres.Service";
 import type PrismaService from "../services/database/Prisma.Service";
-import type { PrismaClientConstructor, PrismaServiceOptions } from "../services/database/Prisma.Service";
+import type { PrismaClientConstructor, PrismaServiceOptions, RegisteredPrismaClient } from "../services/database/Prisma.Service";
 import type RedisService from "../services/Redis.Service";
 import type WebService from "../services/http/Web.Service";
 import type { WebServiceOptions } from "../services/http/Web.Service";
@@ -61,7 +61,7 @@ export interface ServiceDefiner {
 // ------------------------------------------------------------------
 // Prisma  ->  service.prisma
 // ------------------------------------------------------------------
-class PrismaDefiner<TClient = any> implements ServiceDefiner {
+class PrismaDefiner<TClient = RegisteredPrismaClient> implements ServiceDefiner {
 	readonly name = "prisma";
 	private connected = false;
 

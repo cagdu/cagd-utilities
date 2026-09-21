@@ -31,6 +31,23 @@ export interface PrismaServiceOptions<TClient = any> {
 }
 
 /**
+ * `service.prisma` singleton'ının varsayılan client tipi. Boş interface
+ * olduğu için `service.prisma.client` varsayılan olarak `{}` (üye yok) verir.
+ *
+ * Tüketici proje "declaration merging" ile doldurursa, `service.prisma.use(PrismaClient)`
+ * çağrıldıktan sonra `.use()` DÖNÜŞÜNÜ ayrı bir değişkende tutmaya gerek kalmadan,
+ * doğrudan `service.prisma.client.` üzerinde tam IntelliSense/autocomplete çalışır:
+ *
+ *   // src/types/cagd-utilities.d.ts
+ *   import type { PrismaClient } from "../prisma/generated/prisma/client";
+ *
+ *   declare module "cagd-utilities" {
+ *       interface RegisteredPrismaClient extends PrismaClient {}
+ *   }
+ */
+export interface RegisteredPrismaClient {}
+
+/**
  * ============================================================
  *  PRISMA SERVİSİ
  * ============================================================

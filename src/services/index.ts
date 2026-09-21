@@ -22,7 +22,7 @@ import type { IDatabaseService } from "./database/Base.Service";
 import type MssqlServiceClass from "./database/Mssql.Service";
 import type PostgresServiceClass from "./database/Postgres.Service";
 import type PrismaServiceClass from "./database/Prisma.Service";
-import type { DatabaseProvider, PrismaClientConstructor, PrismaServiceOptions } from "./database/Prisma.Service";
+import type { DatabaseProvider, PrismaClientConstructor, PrismaServiceOptions, RegisteredPrismaClient } from "./database/Prisma.Service";
 import type AxiosServiceClass from "./http/Axios.Service";
 import type { AxiosAgent as AxiosAgentClass, AxiosErrorCode, AxiosServiceOptions, InterceptorError } from "./http/Axios.Service";
 import type { createExpressApp as createExpressAppFn, ExpressAppOptions } from "./http/Express.Service";
@@ -32,7 +32,7 @@ import type MailServiceClass from "./Mail.Service";
 import type RedisServiceClass from "./Redis.Service";
 
 export { BaseService };
-export type { AxiosErrorCode, AxiosServiceOptions, DatabaseProvider, ExpressAppOptions, IDatabaseService, InterceptorError, PrismaClientConstructor, PrismaServiceOptions, WebServiceOptions };
+export type { AxiosErrorCode, AxiosServiceOptions, DatabaseProvider, ExpressAppOptions, IDatabaseService, InterceptorError, PrismaClientConstructor, PrismaServiceOptions, RegisteredPrismaClient, WebServiceOptions };
 
 // --------------------------------------------------------------------
 // `declare const` satırları JS üretmez, sadece tip verir (IntelliSense).

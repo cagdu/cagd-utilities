@@ -13,6 +13,10 @@
  *   2) Router    -> /api/health, başlatılan servislerin durumunu döner
  *   3) Bootstrap -> servisleri sırayla başlatır, hata varsa süreci kapatır
  *   4) Shutdown  -> SIGTERM/SIGINT ve beklenmeyen hatalarda düzgün kapanış
+ *
+ * Yanındaki `cagd-utilities.d.ts` dosyasını da kopyala: `config.data`/`cfg`
+ * ve `service.prisma.client`'ın (use() dönüşünü ayrı tutmadan, HER YERDE)
+ * tam tipli/autocomplete'li olması için gerekli.
  */
 import express, { type Router } from "express";
 // Gerçek projede: `npx prisma generate` sonrası oluşan generated client.
@@ -25,7 +29,7 @@ import { baseConfig, baseConfigSchema, config, log, service } from "cagd-utiliti
 //    config.jsonc yoksa otomatik oluşturulur, eksik alan varsa
 //    tamamlanır; bu adım normal şartlarda asla throw etmez.
 // ------------------------------------------------------------------
-const defaultConfig = {
+export const defaultConfig = {
 	...baseConfig,
 	database: {
 		...baseConfig.database,

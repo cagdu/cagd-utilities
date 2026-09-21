@@ -46,7 +46,7 @@ export type { BaseConfig } from "./config/base-config";
 export type { ConfigFacade, ConfigManagerApi } from "./config";
 export type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig } from "./config/types";
 export type { ServiceDefiner } from "./service";
-export type { AxiosErrorCode, AxiosServiceOptions, DatabaseProvider, ExpressAppOptions, IDatabaseService, InterceptorError, PrismaClientConstructor, PrismaServiceOptions, WebServiceOptions } from "./services";
+export type { AxiosErrorCode, AxiosServiceOptions, DatabaseProvider, ExpressAppOptions, IDatabaseService, InterceptorError, PrismaClientConstructor, PrismaServiceOptions, RegisteredPrismaClient, WebServiceOptions } from "./services";
 export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse, ErrorOptions, SuccessOptions, Transaction } from "./util/http";
 export type { Logger } from "./util/logger";
 

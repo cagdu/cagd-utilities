@@ -179,6 +179,30 @@ await prisma.stop();
 - `use()` çağırmazsan client, `config.data.database.prisma.clientPath` (varsayılan `@prisma/client`) üzerinden yüklenir.
 - `service.database`, `service.prisma` için alias'tır.
 
+> **Autocomplete tuzağı:** `service.prisma.use(PrismaClient)` çağrısının dönüşünü yakalamadan
+> (`service.prisma.use(PrismaClient);` gibi tek satır bırakırsan) `service.prisma.client` varsayılan
+> olarak boş bir tip (`RegisteredPrismaClient`) verir ve VS Code'da `.client.` sonrası autocomplete
+> gelmez — `use<T>()` her çağrıda YENİ bir `PrismaDefiner<T>` döner ama `service.prisma` export'unun
+> statik tipi bundan etkilenmez (TypeScript'in çalışma zamanı yan etkileriyle tip değiştirememesi).
+> İki çözüm var:
+>
+> ```ts
+> // 1) .use() dönüşünü yakala (yerelde tipli definer)
+> const prisma = service.prisma.use(PrismaClient);
+> await prisma.client.user.findMany();
+> ```
+>
+> ```ts
+> // 2) declare module ile bir kere doldur, sonrasında service.prisma.client
+> //    HER YERDE (yakalamadan) tam tipli olur — UtilitiesConfig ile aynı desen.
+> // src/types/cagd-utilities.d.ts
+> import type { PrismaClient } from "../prisma/generated/prisma/client";
+>
+> declare module "cagd-utilities" {
+>     interface RegisteredPrismaClient extends PrismaClient {}
+> }
+> ```
+
 ### Web
 
 ```ts
