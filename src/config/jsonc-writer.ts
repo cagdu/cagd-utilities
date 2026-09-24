@@ -29,7 +29,11 @@ function writeNode(value: unknown, schema: unknown, indent: number): string {
 	return lines.join("\n");
 }
 
-const DEFAULT_HEADER = ["// Bu dosya otomatik olarak oluşturulmuştur.", "// Yorum satırları yalnızca açıklama amaçlıdır, dosya JSONC (JSON + yorum) formatındadır.", "// Alan isimlerini SİLMEYİN; eksik alanlar bir sonraki açılışta varsayılan değerlerle otomatik tamamlanır."];
+const DEFAULT_HEADER = [
+	"// Bu dosya otomatik olarak oluşturulmuştur.",
+	"// Yorum satırları yalnızca açıklama amaçlıdır, dosya JSONC (JSON + yorum) formatındadır.",
+	"// Alan isimlerini SİLMEYİN; eksik alanlar bir sonraki açılışta varsayılan değerlerle otomatik tamamlanır.",
+];
 
 /** defaultConfig + schema -> yorumlu JSONC metni. */
 export function buildConfigJsonc(configObject: unknown, schema?: unknown, header: string[] = DEFAULT_HEADER): string {

@@ -1,6 +1,6 @@
 {
   "name": "cagd-utilities",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "API, Agent vb. servislerin ortak kullandığı config / database / web yardımcı katmanı",
   "keywords": [
     "utilities",
@@ -29,6 +29,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "exports": {
@@ -62,21 +63,27 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "clean": "node -e \"require(\\\"fs\\\").rmSync(\\\"dist\\\",{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build && node --test",
+    "check": "npm run lint && npm run format:check && npm test",
     "prepack": "npm run build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run check"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"
   },
   "peerDependencies": {
-    "@prisma/adapter-mssql": "*",
-    "@prisma/adapter-pg": "*",
-    "@prisma/client": "*",
+    "@prisma/adapter-mssql": ">=6.10.0 <8",
+    "@prisma/adapter-pg": ">=6.10.0 <8",
+    "@prisma/client": ">=5 <8",
     "axios": ">=1",
-    "cagd-log": "*",
+    "cagd-log": ">=1.1.0 <2",
     "cors": ">=2",
     "express": ">=4",
     "express-rate-limit": ">=7",
@@ -128,6 +135,7 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@prisma/adapter-mssql": "^7.10.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
@@ -140,14 +148,18 @@
     "axios": "^1.7.7",
     "cagd-log": "1.1.0",
     "cors": "^2.8.5",
+    "eslint": "^9.39.5",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
+    "globals": "^17.12.0",
     "helmet": "^8.0.0",
     "mssql": "^12.7.2",
     "nodemailer": "^6.9.15",
     "pg": "^8.13.1",
+    "prettier": "^3.9.9",
     "redis": "^4.7.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.70.1"
   },
   "typesVersions": {
     "*": {

@@ -67,6 +67,8 @@ export function errorResponse({ message = "An error occurred", data = null, code
 }
 
 declare global {
+	// Express'in kendi tipleri global `Express` namespace'i üzerinden genişletilir.
+	// eslint-disable-next-line @typescript-eslint/no-namespace
 	namespace Express {
 		interface Response {
 			success: <T = any>(options?: SuccessOptions<T>, statusCode?: number) => ExpressResponse;
@@ -75,7 +77,7 @@ declare global {
 	}
 }
 
-/** res.success() / res.error() helper'larını ekler. */
+/** res.success() / res.error() helper'larını ekler. `transaction.request_id` için `X-Request-Id` başlığını kullanır. */
 export function responserMiddleware(req: Request, res: ExpressResponse, next: NextFunction): void {
 	const startTime = Date.now();
 	const requestId = (req.headers["x-request-id"] as string) || null;

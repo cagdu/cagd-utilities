@@ -1,11 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
-import { parse as parseJsonc, type ParseError } from "jsonc-parser";
+import { applyEdits, modify, parse as parseJsonc, type ParseError } from "jsonc-parser";
 
 import { log } from "../util/logger";
-import { deepClone, deepMerge, isPlainObject } from "./deep-merge";
+import { baseConfigEnv } from "./base-config";
+import { deepClone, deepEqual, deepMerge, findMissingPaths, isPlainObject } from "./deep-merge";
+import { readEnv } from "./env";
 import { buildConfigJsonc } from "./jsonc-writer";
-import type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig } from "./types";
+import type { ConfigChangeListener, ConfigEnvMap, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig } from "./types";
+
+type ManagerOptions = {
+	fileName: string;
+	cwd: string;
+	useFile: boolean;
+	writeBack: boolean;
+	header?: string[];
+	env: ConfigEnvMap | false;
+};
+
+const JSONC_FORMAT = { formattingOptions: { insertSpaces: false, tabSize: 1, eol: "\n" } };
 
 /**
  * ============================================================
@@ -13,22 +26,34 @@ import type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial
  * ============================================================
  * Tek bir modül seviyesinde (singleton) config deposu tutar.
  *
- *  - setDefaultConfig(defaults, options?) : varsayılanları tanımlar, varsa
- *    config.jsonc dosyasını okuyup merge eder ve TAM TİPLİ bir API döner.
- *  - setConfig(partial)                  : runtime'da config'i günceller.
- *    Reboot gerekmez; `config` proxy'si her okumada güncel değeri verir.
- *  - config                              : canlı (live) proxy. Referansı
- *    değişmez, ama içeriği her zaman günceldir.
+ * Config KATMANLAR halinde tutulur (sağdaki soldakini ezer):
+ *
+ *   varsayılan (defaults)  <  config.jsonc  <  ortam değişkeni  <  setConfig()
+ *
+ *  - setDefaultConfig(defaults, options?) : varsayılanları tanımlar, dosyayı ve
+ *    ortam değişkenlerini okur, TAM TİPLİ canlı proxy döner.
+ *  - setConfig(partial, persist?)         : runtime katmanını günceller. Reboot
+ *    gerekmez. `persist` ise değer dosya katmanına da yazılır.
+ *  - proxy                                : referansı hiç değişmeyen, içeriği
+ *    daima güncel olan canlı görünüm.
+ *
+ * Ortam değişkenlerinden gelen değerler dosyaya ASLA yazılmaz (şifreler sızmaz).
  */
 export class ConfigManager {
 	private defaults: Record<string, any> = {};
+	private fileData: Record<string, any> = {};
+	private envData: Record<string, any> = {};
+	private runtime: Record<string, any> = {};
 	private current: Record<string, any> = {};
+	private version = 0;
+	private fileBroken = false;
 	private schema: Record<string, any> | undefined;
-	private options: Required<Omit<ConfigInitOptions<any>, "schema" | "header">> & { header?: string[] } = {
+	private options: ManagerOptions = {
 		fileName: "config.jsonc",
 		cwd: process.cwd(),
 		useFile: true,
 		writeBack: true,
+		env: baseConfigEnv,
 	};
 	private listeners = new Set<ConfigChangeListener<any>>();
 	private initialized = false;
@@ -40,7 +65,8 @@ export class ConfigManager {
 			return this.current[prop as string];
 		},
 		set: (_t, prop: string | symbol, value) => {
-			this.current[prop as string] = value;
+			this.runtime[prop as string] = value;
+			this.recompute();
 			this.emit();
 			return true;
 		},
@@ -48,24 +74,35 @@ export class ConfigManager {
 		ownKeys: () => Reflect.ownKeys(this.current),
 		getOwnPropertyDescriptor: (_t, prop) => {
 			if (!(prop in this.current)) return undefined;
-			return { configurable: true, enumerable: true, value: this.current[prop as string] };
+			return { configurable: true, enumerable: true, writable: true, value: this.current[prop as string] };
 		},
 		deleteProperty: (_t, prop) => {
-			delete this.current[prop as string];
+			delete this.runtime[prop as string];
+			this.recompute();
 			this.emit();
 			return true;
 		},
 	}) as ResolvedConfig;
 
 	// ------------------------------------------------------------------
-	// Yol (path) hesaplama
+	// Yol (path) hesaplama / durum
 	// ------------------------------------------------------------------
 	public configPath(): string {
-		return path.normalize(path.join(this.options.cwd, this.options.fileName));
+		return path.normalize(path.resolve(this.options.cwd, this.options.fileName));
 	}
 
 	public isInitialized(): boolean {
 		return this.initialized;
+	}
+
+	/** Config her değiştiğinde artan sayaç (önbellek geçersizleştirme için). */
+	public getVersion(): number {
+		return this.version;
+	}
+
+	/** Anlık config'in KENDİSİ (kopya değil). Sadece okuma amaçlı, paket içi kullanım içindir. */
+	public peek(): Readonly<Record<string, any>> {
+		return this.current;
 	}
 
 	// ------------------------------------------------------------------
@@ -82,14 +119,14 @@ export class ConfigManager {
 		if (options.useFile !== undefined) this.options.useFile = options.useFile;
 		if (options.writeBack !== undefined) this.options.writeBack = options.writeBack;
 		if (options.header !== undefined) this.options.header = options.header;
+		if (options.env !== undefined) this.options.env = options.env;
 
-		// Daha önce setConfig ile verilmiş değerler varsa korunur.
-		const previous = this.initialized ? this.current : {};
-		this.current = deepMerge(this.defaults, previous);
-
-		if (this.options.useFile) this.current = deepMerge(this.current, this.readFile());
+		// Daha önce setConfig ile verilmiş (runtime) değerler korunur.
+		this.fileData = this.options.useFile ? this.readFile() : {};
+		this.envData = this.options.env ? readEnv(this.defaults, this.options.env) : {};
 
 		this.initialized = true;
+		this.recompute();
 		this.emit();
 
 		return this.proxy as unknown as T;
@@ -106,18 +143,22 @@ export class ConfigManager {
 	public setConfig<T extends Record<string, any> = ResolvedConfig>(partial: DeepPartial<T> | Record<string, any>, persist = false): T {
 		if (!isPlainObject(partial)) throw new TypeError("setConfig(): 'partial' bir obje olmalıdır.");
 
-		this.current = deepMerge(this.current, partial);
+		this.runtime = deepMerge(this.runtime, partial);
+		if (persist) {
+			this.fileData = deepMerge(this.fileData, partial);
+			this.persistFileData();
+		}
+
+		this.recompute();
 		this.emit();
-
-		if (persist) this.writeFile(this.current);
-
 		return this.proxy as unknown as T;
 	}
 
-	/** Config'i varsayılanlara (ve istenirse dosyaya) geri döndürür. */
+	/** Runtime değişikliklerini siler; config'i varsayılan + dosya + ortam değişkenlerine döndürür. */
 	public resetConfig(reloadFile = true): ResolvedConfig {
-		this.current = deepClone(this.defaults);
-		if (reloadFile && this.options.useFile) this.current = deepMerge(this.current, this.readFile());
+		this.runtime = {};
+		if (reloadFile && this.options.useFile) this.fileData = this.readFile();
+		this.recompute();
 		this.emit();
 		return this.proxy;
 	}
@@ -133,12 +174,17 @@ export class ConfigManager {
 		return () => this.listeners.delete(listener as ConfigChangeListener<any>);
 	}
 
+	private recompute(): void {
+		this.current = deepMerge(deepMerge(deepMerge(this.defaults, this.fileData), this.envData), this.runtime);
+		this.version++;
+	}
+
 	private emit(): void {
 		for (const listener of this.listeners) {
 			try {
 				listener(this.proxy);
 			} catch (err) {
-				log.error("ConfigManager: onChange listener hata verdi:", err);
+				log.error("ConfigManager: onChange dinleyicisi hata verdi:", err);
 			}
 		}
 	}
@@ -150,8 +196,9 @@ export class ConfigManager {
 		const cnfPath = this.configPath();
 
 		if (!fs.existsSync(cnfPath)) {
-			log.warn(`Config file not found at ${cnfPath}. Creating with default values.`);
-			this.writeFile(this.defaults, true);
+			log.warn(`Config dosyası bulunamadı (${cnfPath}), varsayılan değerlerle oluşturuluyor.`);
+			this.fileBroken = false;
+			this.writeText(cnfPath, buildConfigJsonc(this.defaults, this.schema, this.options.header), true);
 			return {};
 		}
 
@@ -160,60 +207,127 @@ export class ConfigManager {
 			const parseErrors: ParseError[] = [];
 			const parsed = parseJsonc(raw, parseErrors, { allowTrailingComma: true, disallowComments: false });
 
-			if (parseErrors.length > 0) {
-				log.error(`Error(s) parsing ${cnfPath}. Falling back to default config for this run:`, parseErrors);
+			if (parseErrors.length > 0 || !isPlainObject(parsed)) {
+				this.fileBroken = true;
+				log.error(`Config dosyası okunamadı (${cnfPath}). Bu çalıştırmada varsayılanlar kullanılıyor; dosya düzeltilene kadar dosyaya yazılmayacak.`, parseErrors);
 				return {};
 			}
+			this.fileBroken = false;
 
-			if (!isPlainObject(parsed)) return {};
-
-			// Eksik alan var mı? Varsa dosyayı tamamla (yorumları koruyarak yeniden üret).
+			// Gerçekten eksik alan varsa SADECE onları ekle; mevcut içerik ve yorumlar korunur.
 			if (this.options.writeBack) {
-				const merged = deepMerge(this.defaults, parsed);
-				if (JSON.stringify(parsed) !== JSON.stringify(merged)) {
-					this.writeFile(merged, true);
-					log.warn(`Config file at ${cnfPath} was missing some fields. Filled with defaults.`);
+				const missing = findMissingPaths(this.defaults, parsed);
+				if (missing.length > 0) {
+					let text = raw;
+					for (const keyPath of missing) {
+						let value: unknown = this.defaults;
+						for (const key of keyPath) value = (value as Record<string, unknown>)[key];
+						text = applyEdits(text, modify(text, keyPath, value, JSONC_FORMAT));
+					}
+					this.writeText(cnfPath, text, true);
+					log.warn(`Config dosyasına eksik alanlar varsayılan değerleriyle eklendi (${cnfPath}): ${missing.map(p => p.join(".")).join(", ")}`);
 				}
 			}
 
 			return parsed;
 		} catch (err: any) {
-			this.logFsError("reading", cnfPath, err);
+			this.logFsError("okunurken", cnfPath, err);
 			return {};
 		}
 	}
 
-	/** config.jsonc dosyasını (açıklama yorumlarıyla birlikte) yazar. */
-	public writeFile(value?: Record<string, any>, silent = false): void {
+	/** Dosya katmanını diske yazar. Dosya varsa sadece değişen alanlar güncellenir (yorumlar korunur). */
+	private persistFileData(): void {
 		const cnfPath = this.configPath();
+		if (this.fileBroken) {
+			log.error(`Config dosyası bozuk olduğu için yazılmadı (${cnfPath}). Önce dosyayı düzeltin.`);
+			return;
+		}
+
+		const target = deepMerge(this.defaults, this.fileData);
+		let raw: string | null = null;
 		try {
-			const merged = deepMerge(this.defaults, value ?? this.current);
+			if (fs.existsSync(cnfPath)) raw = fs.readFileSync(cnfPath, { encoding: "utf8" });
+		} catch (err) {
+			this.logFsError("okunurken", cnfPath, err);
+			return;
+		}
+
+		if (raw === null) {
+			this.writeText(cnfPath, buildConfigJsonc(target, this.schema, this.options.header));
+			return;
+		}
+
+		const errors: ParseError[] = [];
+		const parsed = parseJsonc(raw, errors, { allowTrailingComma: true });
+		if (errors.length > 0 || !isPlainObject(parsed)) {
+			log.error(`Config dosyası bozuk olduğu için yazılmadı (${cnfPath}). Önce dosyayı düzeltin.`);
+			return;
+		}
+
+		let text = raw;
+		const patch = (want: unknown, have: unknown, keyPath: string[]): void => {
+			if (isPlainObject(want) && isPlainObject(have)) {
+				for (const key of Object.keys(want)) patch(want[key], have[key], [...keyPath, key]);
+				return;
+			}
+			if (!deepEqual(want, have)) text = applyEdits(text, modify(text, keyPath, want, JSONC_FORMAT));
+		};
+		patch(target, parsed, []);
+
+		if (text !== raw) this.writeText(cnfPath, text);
+	}
+
+	/**
+	 * config.jsonc dosyasını yazar.
+	 * - `value` verilmezse: dosyadaki değerler + setConfig() ile yapılan runtime değişiklikleri yazılır.
+	 * - `value` verilirse: dosya katmanı bu değerle değiştirilir.
+	 * Ortam değişkenlerinden gelen değerler yazılmaz.
+	 */
+	public writeFile(value?: Record<string, any>): void {
+		this.fileData = value ? deepClone(value) : deepMerge(this.fileData, this.runtime);
+		this.persistFileData();
+		this.recompute();
+		this.emit();
+	}
+
+	private writeText(cnfPath: string, text: string, silent = false): void {
+		try {
 			fs.mkdirSync(path.dirname(cnfPath), { recursive: true });
-			fs.writeFileSync(cnfPath, buildConfigJsonc(merged, this.schema, this.options.header), { encoding: "utf8" });
-			if (!silent) log.info(`Config written to ${cnfPath}`);
+			fs.writeFileSync(cnfPath, text, { encoding: "utf8" });
+			if (!silent) log.info(`Config dosyaya yazıldı: ${cnfPath}`);
 		} catch (err: any) {
-			this.logFsError("writing", cnfPath, err);
+			this.logFsError("yazılırken", cnfPath, err);
 		}
 	}
 
-	/** Dosyayı yeniden okuyup config'i günceller (hot reload). */
+	/** Dosyayı yeniden okuyup config'i günceller (hot reload). Dosyadan silinen alanlar varsayılana döner. */
 	public reloadFile(): ResolvedConfig {
 		if (!this.options.useFile) return this.proxy;
-		this.current = deepMerge(this.current, this.readFile());
+		this.fileData = this.readFile();
+		this.recompute();
 		this.emit();
 		return this.proxy;
 	}
 
-	/** config.jsonc dosyasını izler; değiştiğinde config otomatik güncellenir. */
+	/**
+	 * config.jsonc dosyasını izler; değiştiğinde config otomatik güncellenir.
+	 * Dosya yerine DİZİN izlenir; böylece editörlerin "atomic save" (yeni dosya
+	 * yazıp eskisinin yerine taşıma) yöntemiyle kaydetmesi izlemeyi koparmaz.
+	 */
 	public watchFile(): () => void {
 		const cnfPath = this.configPath();
-		if (!fs.existsSync(cnfPath)) return () => {};
+		const dir = path.dirname(cnfPath);
+		const base = path.basename(cnfPath);
+		if (!fs.existsSync(dir)) return () => {};
 
 		let timer: NodeJS.Timeout | null = null;
-		const watcher = fs.watch(cnfPath, () => {
+		const watcher = fs.watch(dir, (_event, filename) => {
+			if (filename && filename.toString() !== base) return;
 			if (timer) clearTimeout(timer);
 			timer = setTimeout(() => this.reloadFile(), 150);
 		});
+		watcher.on("error", err => log.error(`Config dizini izlenirken hata (${dir}):`, err));
 
 		return () => {
 			if (timer) clearTimeout(timer);
@@ -224,13 +338,13 @@ export class ConfigManager {
 	private logFsError(action: string, cnfPath: string, err: any): void {
 		switch (err?.code) {
 			case "EACCES":
-				log.error(`Permission denied ${action} config file at ${cnfPath}:`, err);
+				log.error(`Config dosyası ${action} izin hatası (${cnfPath}):`, err);
 				break;
 			case "EISDIR":
-				log.error(`Expected a file but found a directory at ${cnfPath}:`, err);
+				log.error(`Config dosyası bekleniyordu ama dizin bulundu (${cnfPath}):`, err);
 				break;
 			default:
-				log.error(`Error ${action} config file at ${cnfPath}:`, err);
+				log.error(`Config dosyası ${action} hata (${cnfPath}):`, err);
 				break;
 		}
 	}

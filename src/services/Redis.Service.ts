@@ -1,55 +1,96 @@
 import { createClient, type RedisClientType } from "redis";
 
-import { config } from "../config";
+import { baseCfg } from "../config/access";
 import { log } from "../util/logger";
+
+/** Log'a basılacak adresten şifreyi çıkarır. */
+function safeUrl(url: string): string {
+	try {
+		const u = new URL(url);
+		if (u.password) u.password = "***";
+		return u.toString();
+	} catch {
+		return url;
+	}
+}
 
 export class RedisService {
 	private static instance: RedisService | null = null;
-	private static client: RedisClientType | null = null;
-	private static isConnected = false;
+	private static _client: RedisClientType | null = null;
+	private static connecting: Promise<void> | null = null;
 
-	private constructor() {
-		if (!RedisService.client) {
-			const cfg = (config as any)?.services?.redis ?? {};
-
-			RedisService.client = createClient({
-				url: cfg.url || process.env.REDIS_URL || `redis://${cfg.host || process.env.REDIS_HOST || "localhost"}:${cfg.port || process.env.REDIS_PORT || 6379}`,
-				password: cfg.password || process.env.REDIS_PASSWORD || undefined,
-				database: cfg.db ?? (process.env.REDIS_DB ? Number(process.env.REDIS_DB) : 0),
-				socket: {
-					reconnectStrategy: (retries: number) => Math.min(retries * 100, 3000),
-				},
-			}) as RedisClientType;
-
-			RedisService.client.on("error", err => log.error("RedisService", err));
-			RedisService.client.on("ready", () => { log.info(`RedisService: Is connected. (${cfg.host})`); RedisService.isConnected = true; });
-			RedisService.client.on("end", () => (RedisService.isConnected = false));
-		}
-	}
+	private constructor() {}
 
 	public static getInstance(): RedisService {
 		if (!RedisService.instance) RedisService.instance = new RedisService();
 		return RedisService.instance;
 	}
 
+	private static createClient(): RedisClientType {
+		const cfg = baseCfg().services.redis;
+		const url = cfg.url || `redis://${cfg.host}:${cfg.port}`;
+		let everReady = false;
+
+		const client = createClient({
+			url,
+			password: cfg.password || undefined,
+			database: cfg.db,
+			socket: {
+				// İlk bağlantıda `connectRetries` denemeden sonra vazgeç (connect() hata ile döner);
+				// bir kez bağlandıktan sonra kopmalarda sınırsız yeniden dene.
+				reconnectStrategy: (retries: number) => {
+					if (!everReady && retries >= cfg.connectRetries) return new Error(`RedisService: ${safeUrl(url)} adresine ${retries} denemede bağlanılamadı.`);
+					return Math.min(retries * 100, 3000);
+				},
+			},
+		}) as RedisClientType;
+
+		client.on("error", err => log.error("RedisService:", err?.message ?? err));
+		client.on("ready", () => {
+			everReady = true;
+			log.info(`RedisService: bağlandı (${safeUrl(url)}).`);
+		});
+
+		return client;
+	}
+
+	/** Ham redis client. İlk erişimde oluşturulur (bağlanmaz; bağlanmak için connect()). */
 	public get client(): RedisClientType {
-		if (!RedisService.client) throw new Error("Redis client is not initialized");
-		return RedisService.client;
+		if (!RedisService._client) RedisService._client = RedisService.createClient();
+		return RedisService._client;
 	}
 
 	public get connected(): boolean {
-		return RedisService.isConnected;
+		return RedisService._client?.isReady ?? false;
 	}
 
+	/** Bağlanır. İdempotent: bağlıysa ya da bağlanıyorsa aynı işlemi bekler. */
 	async connect(): Promise<void> {
-		if (RedisService.client && !RedisService.isConnected) await RedisService.client.connect();
+		const client = this.client;
+		if (client.isOpen && !RedisService.connecting) return;
+
+		if (!RedisService.connecting) {
+			RedisService.connecting = client
+				.connect()
+				.then(() => undefined)
+				.catch(async err => {
+					// Başarısız client'ı tamamen bırak; bir sonraki connect() temiz bir client ile başlasın.
+					if (RedisService._client === client) RedisService._client = null;
+					if (client.isOpen) await client.disconnect().catch(() => undefined);
+					throw err;
+				})
+				.finally(() => {
+					RedisService.connecting = null;
+				});
+		}
+		return RedisService.connecting;
 	}
 
 	async healthCheck(): Promise<boolean> {
 		try {
 			return (await this.client.ping()) === "PONG";
 		} catch (err) {
-			log.error("RedisService: healthCheck başarısız.", err);
+			log.warn("RedisService: healthCheck başarısız.", err);
 			return false;
 		}
 	}
@@ -95,14 +136,19 @@ export class RedisService {
 		return this.client.incr(key);
 	}
 
+	/**
+	 * Bağlantıyı kapatır. İdempotent. Bağlıysa bekleyen komutlar tamamlanır (quit);
+	 * bağlanmaya/yeniden bağlanmaya çalışıyorsa bu denemeler durdurulur (disconnect).
+	 */
 	async close(): Promise<void> {
-		if (RedisService.client) {
-			if (RedisService.isConnected) await RedisService.client.quit();
-			RedisService.client = null;
-			RedisService.instance = null;
-			RedisService.isConnected = false;
-			log.info("Redis client closed");
-		}
+		const client = RedisService._client;
+		RedisService._client = null;
+		RedisService.instance = null;
+		if (!client) return;
+
+		if (client.isReady) await client.quit();
+		else if (client.isOpen) await client.disconnect();
+		log.info("RedisService: bağlantı kapatıldı.");
 	}
 }
 

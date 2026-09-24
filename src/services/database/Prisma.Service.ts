@@ -1,5 +1,6 @@
-import { config } from "../../config";
+import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
+import { requireFromApp } from "../../util/require";
 import type MssqlService from "./Mssql.Service";
 import type PostgresService from "./Postgres.Service";
 
@@ -8,10 +9,10 @@ import type PostgresService from "./Postgres.Service";
  * gerçekten kurulmaya çalışıldığında require edilir. Böylece postgres
  * kullanan bir proje mssql paketini kurmak zorunda kalmaz (ve tersi).
  */
-/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const loadMssql = (): typeof MssqlService => require("./Mssql.Service").default;
 const loadPostgres = (): typeof PostgresService => require("./Postgres.Service").default;
-/* eslint-enable @typescript-eslint/no-var-requires */
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 export type DatabaseProvider = "postgres" | "mssql";
 
@@ -22,11 +23,15 @@ export interface PrismaClientConstructor<TClient = any> {
 export interface PrismaServiceOptions<TClient = any> {
 	/** Generated PrismaClient sınıfı. Verilmezse `config.database.prisma.clientPath` üzerinden dinamik yüklenir. */
 	client?: PrismaClientConstructor<TClient>;
-	/** "postgres" | "mssql". Verilmezse config.database.provider ya da DATABASE_TYPE kullanılır. */
+	/** "postgres" | "mssql". Verilmezse config.database.provider (env: DATABASE_TYPE) kullanılır. */
 	provider?: DatabaseProvider;
-	/** PrismaClient'a geçilecek ek seçenekler (log, errorFormat vs.). */
+	/** PrismaClient'a geçilecek ek seçenekler (log, errorFormat, accelerateUrl vs.). */
 	clientOptions?: Record<string, any>;
-	/** Adapter kullanma, doğrudan DATABASE_URL ile bağlan. */
+	/**
+	 * Driver adapter kullanma. PrismaClient sadece `clientOptions` ile oluşturulur.
+	 * - Prisma 6 ve öncesi (engine tabanlı client): bağlantı schema.prisma'daki `url` (örn. env("DATABASE_URL")) ile kurulur.
+	 * - Prisma 7: adapter zorunludur; adapter'sız kullanım sadece `clientOptions: { accelerateUrl }` ile mümkündür.
+	 */
 	disableAdapter?: boolean;
 }
 
@@ -51,16 +56,13 @@ export interface RegisteredPrismaClient {}
  * ============================================================
  *  PRISMA SERVİSİ
  * ============================================================
- * Orijinal PrismaService ile aynı desen (private constructor + static
- * singleton), ancak paket haline gelebilmesi için üç fark var:
- *
  *  1. Generated PrismaClient import EDİLMEZ. O sınıf tüketici projede
  *     üretildiği için dışarıdan `register()` ile verilir; böylece tip
  *     güvenliği kaybolmadan paket tüketiciye bağımlı olmaz.
  *  2. Adapter paketleri (@prisma/adapter-pg / -mssql) lazy require edilir.
- *     Kurulu değillerse DATABASE_URL üzerinden bağlanmaya düşer.
- *  3. Provider seçimi önce config.database.provider, sonra
- *     process.env.DATABASE_TYPE üzerinden yapılır.
+ *     Kurulu değillerse ne yapılması gerektiğini söyleyen net bir hata fırlatılır.
+ *  3. Provider seçimi: register() seçeneği > config.database.provider (env: DATABASE_TYPE).
+ *  4. Client LAZY oluşturulur: ilk `client` erişiminde.
  *
  *   import { PrismaClient } from "../prisma/generated/prisma/client";
  *   PrismaService.register(PrismaClient);
@@ -73,28 +75,24 @@ export class PrismaService<TClient = any> {
 	private static ctor: PrismaClientConstructor<any> | null = null;
 	private static options: PrismaServiceOptions<any> = {};
 
-	private constructor() {
-		if (!PrismaService.client) PrismaService.client = PrismaService.createClient();
-	}
+	private constructor() {}
 
 	/**
 	 * Generated PrismaClient sınıfını (ve isteğe bağlı seçenekleri) kaydeder.
-	 * getInstance()'tan ÖNCE çağrılmalıdır. Tipli servisi geri döner.
+	 * Önceden oluşturulmuş bir client varsa bağlantısı kapatılır. Tipli servisi geri döner.
 	 */
 	public static register<T>(client: PrismaClientConstructor<T>, options: Omit<PrismaServiceOptions<T>, "client"> = {}): typeof PrismaService & { getInstance(): PrismaService<T> } {
 		PrismaService.ctor = client;
 		PrismaService.options = { ...PrismaService.options, ...options };
-		PrismaService.client = null;
-		PrismaService.instance = null;
+		PrismaService.disposeClient();
 		return PrismaService as typeof PrismaService & { getInstance(): PrismaService<T> };
 	}
 
-	/** Sadece seçenekleri güncellemek için. */
+	/** Sadece seçenekleri güncellemek için. Önceden oluşturulmuş bir client varsa bağlantısı kapatılır. */
 	public static configure(options: PrismaServiceOptions<any>): void {
 		if (options.client) PrismaService.ctor = options.client;
 		PrismaService.options = { ...PrismaService.options, ...options };
-		PrismaService.client = null;
-		PrismaService.instance = null;
+		PrismaService.disposeClient();
 	}
 
 	public static getInstance<T = any>(): PrismaService<T> {
@@ -104,7 +102,7 @@ export class PrismaService<TClient = any> {
 
 	/** Aktif provider. */
 	public static getProvider(): DatabaseProvider {
-		const value = PrismaService.options.provider ?? (config as any)?.database?.provider ?? process.env.DATABASE_TYPE ?? "postgres";
+		const value = PrismaService.options.provider ?? baseCfg().database.provider;
 		return value === "mssql" ? "mssql" : "postgres";
 	}
 
@@ -112,38 +110,43 @@ export class PrismaService<TClient = any> {
 		return PrismaService.getProvider();
 	}
 
+	/** Prisma client. İlk erişimde oluşturulur. */
 	public get client(): TClient {
-		if (!PrismaService.client) throw new Error("Prisma client is not initialized");
+		if (!PrismaService.client) PrismaService.client = PrismaService.createClient();
 		return PrismaService.client as TClient;
+	}
+
+	/** Mevcut client'ı bırakır ve bağlantısını arka planda kapatır (register/configure sonrası sızıntıyı önler). */
+	private static disposeClient(): void {
+		const old = PrismaService.client;
+		PrismaService.client = null;
+		PrismaService.instance = null;
+		if (old && typeof old.$disconnect === "function") {
+			Promise.resolve(old.$disconnect()).catch((err: unknown) => log.warn("PrismaService: eski client kapatılırken hata.", err));
+		}
 	}
 
 	// ------------------------------------------------------------------
 	private static createClient(): any {
 		const Ctor = PrismaService.ctor ?? PrismaService.resolveCtor();
-		if (!Ctor) throw new Error("PrismaService: PrismaClient bulunamadı. `PrismaService.register(PrismaClient)` ile kaydet ya da `config.database.prisma.clientPath` alanını ayarla.");
+		if (!Ctor) throw new Error("PrismaService: PrismaClient bulunamadı. `service.prisma.use(PrismaClient)` ile kaydet ya da `config.database.prisma.clientPath` alanını ayarla.");
 
 		const clientOptions: Record<string, any> = { ...(PrismaService.options.clientOptions ?? {}) };
 
-		if (PrismaService.options.disableAdapter) {
-			// Adapter bilinçli olarak devre dışı: klasik (engine tabanlı) generated client,
-			// DATABASE_URL üzerinden bağlanır.
-			if (process.env.DATABASE_URL) clientOptions.datasourceUrl = process.env.DATABASE_URL;
-		} else {
+		if (!PrismaService.options.disableAdapter) {
 			const provider = PrismaService.getProvider();
 			const adapter = PrismaService.createAdapter();
 
 			if (!adapter) {
 				const pkg = provider === "mssql" ? "@prisma/adapter-mssql" : "@prisma/adapter-pg";
 				const driverPkg = provider === "mssql" ? "mssql" : "pg";
-				// NOT: driver adapter kullanan (schema.prisma'da `driverAdapters` preview feature'ı
-				// açık) generated client'lar SADECE `adapter` seçeneğini kabul eder; `datasources`/
-				// `datasourceUrl` ile sessizce devam etmek Prisma runtime'ında "Unknown property"
-				// hatasıyla çöker. Bu yüzden burada erken ve net bir hata fırlatılıyor.
+				// NOT: driver adapter kullanan generated client'lar SADECE `adapter` seçeneğini kabul eder;
+				// adapter'sız sessizce devam etmek Prisma runtime'ında anlaşılması zor bir hatayla çöker.
 				throw new Error(
 					`PrismaService: '${pkg}' (ve '${driverPkg}') paketleri bulunamadı/yüklenemedi. ` +
 						`Kur: npm i ${pkg} ${driverPkg}. Adapter kullanmak istemiyorsan ` +
-						`PrismaService.register(PrismaClient, { disableAdapter: true }) ver ve DATABASE_URL tanımla ` +
-						`(sadece klasik/engine tabanlı generated client'larda çalışır).`,
+						`service.prisma.use(PrismaClient, { disableAdapter: true }) ver ` +
+						`(Prisma 6 ve öncesinde schema.prisma'daki url kullanılır; Prisma 7'de clientOptions.accelerateUrl gerekir).`,
 				);
 			}
 
@@ -155,12 +158,11 @@ export class PrismaService<TClient = any> {
 	}
 
 	private static resolveCtor(): PrismaClientConstructor<any> | null {
-		const candidates = [(config as any)?.database?.prisma?.clientPath, "@prisma/client"].filter(Boolean) as string[];
+		const candidates = [...new Set([baseCfg().database.prisma.clientPath, "@prisma/client"].filter(Boolean))];
 
 		for (const candidate of candidates) {
 			try {
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				const mod = require(candidate);
+				const mod = requireFromApp(candidate);
 				const Ctor = mod?.PrismaClient ?? mod?.default?.PrismaClient;
 				if (typeof Ctor === "function") return Ctor as PrismaClientConstructor<any>;
 			} catch {
@@ -185,12 +187,10 @@ export class PrismaService<TClient = any> {
 
 		try {
 			if (provider === "mssql") {
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				AdapterCtor = require("@prisma/adapter-mssql").PrismaMssql;
+				AdapterCtor = requireFromApp("@prisma/adapter-mssql").PrismaMssql;
 				poolConfig = loadMssql().getPoolConfig();
 			} else {
-				// eslint-disable-next-line @typescript-eslint/no-var-requires
-				AdapterCtor = require("@prisma/adapter-pg").PrismaPg;
+				AdapterCtor = requireFromApp("@prisma/adapter-pg").PrismaPg;
 				poolConfig = loadPostgres().getPoolConfig();
 			}
 		} catch (err) {
@@ -207,7 +207,7 @@ export class PrismaService<TClient = any> {
 			await (this.client as any).$queryRaw`SELECT 1`;
 			return true;
 		} catch (err) {
-			log.error("PrismaService: healthCheck başarısız.", err);
+			log.warn("PrismaService: healthCheck başarısız.", err);
 			return false;
 		}
 	}
@@ -217,12 +217,14 @@ export class PrismaService<TClient = any> {
 		await (this.client as any).$connect?.();
 	}
 
+	/** Bağlantıyı kapatır. İdempotent. */
 	async close(): Promise<void> {
-		if (PrismaService.client) {
-			await PrismaService.client.$disconnect?.();
-			PrismaService.client = null;
-			PrismaService.instance = null;
-			log.info("Prisma client disconnected");
+		const client = PrismaService.client;
+		PrismaService.client = null;
+		PrismaService.instance = null;
+		if (client) {
+			await client.$disconnect?.();
+			log.info("PrismaService: client bağlantısı kapatıldı.");
 		}
 	}
 }

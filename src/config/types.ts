@@ -4,22 +4,24 @@
  * ============================================================
  *
  * `UtilitiesConfig` boş bir interface'tir ve TÜKETİCİ PROJE tarafından
- * "declaration merging" ile doldurulur. Böylece `utilities.config.` yazdığında
+ * "declaration merging" ile doldurulur. Böylece `config.data.` yazdığında
  * IntelliSense senin kendi config objeni gösterir.
  *
  * Tüketici projede (örn. api/src/types/cagd-utilities.d.ts):
  *
- *   import { defaultConfig } from "../config/default-config";
+ *   import type { defaultConfig } from "../config";
+ *
+ *   type DefaultConfigType = typeof defaultConfig;
  *
  *   declare module "cagd-utilities" {
- *       interface UtilitiesConfig extends       typeof defaultConfig {}
+ *       interface UtilitiesConfig extends DefaultConfigType {}
  *   }
  *
- * Alternatif (daha pratik) yol: `setDefaultConfig()` çağrısının DÖNÜŞ değerini
- * kullanmak. O dönüş değeri zaten tam tipli olduğu için d.ts yazmana gerek kalmaz:
+ * Alternatif (daha pratik) yol: `config.manager.setDefaultConfig()` çağrısının
+ * DÖNÜŞ değerini kullanmak. O değer zaten tam tipli olduğu için d.ts gerekmez:
  *
- *   export const utils = utilities.setDefaultConfig(defaultConfig);
- *   utils.config.database.postgres.host; // ✅ tam tipli
+ *   export const cfg = config.manager.setDefaultConfig(defaultConfig);
+ *   cfg.database.postgres.host; // ✅ tam tipli
  */
 export interface UtilitiesConfig {}
 
@@ -35,6 +37,15 @@ export type ConfigSchema<T> = {
 };
 
 export type ConfigChangeListener<T = ResolvedConfig> = (config: T) => void;
+
+/**
+ * Config yolu -> ortam değişkeni adı eşlemesi.
+ *
+ *   { "database.postgres.host": "PGHOST", "services.web.port": "WEB_PORT" }
+ *
+ * Değer, varsayılan değerin tipine göre dönüştürülür (number / boolean / dizi / obje).
+ */
+export type ConfigEnvMap = Record<string, string>;
 
 export interface ConfigInitOptions<T> {
 	/** config dosyasının adı. Varsayılan: "config.jsonc" */
@@ -56,4 +67,13 @@ export interface ConfigInitOptions<T> {
 	schema?: ConfigSchema<NoInfer<T>>;
 	/** Dosya oluşturulurken en üste eklenecek yorum satırları. */
 	header?: string[];
+	/**
+	 * Ortam değişkeni eşlemesi. Varsayılan: `baseConfigEnv`.
+	 * Kendi alanlarını eklemek için: `{ ...baseConfigEnv, "app.name": "APP_NAME" }`.
+	 * `false` verilirse ortam değişkenleri hiç okunmaz.
+	 *
+	 * Öncelik: setConfig() > ortam değişkeni > config.jsonc > varsayılan.
+	 * Ortam değişkeninden gelen değerler config.jsonc dosyasına ASLA yazılmaz.
+	 */
+	env?: ConfigEnvMap | false;
 }
