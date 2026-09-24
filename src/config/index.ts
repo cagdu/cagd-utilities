@@ -1,5 +1,5 @@
 import { config as configValues, configManager, ConfigManager } from "./manager";
-import type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig } from "./types";
+import type { ConfigChangeListener, ConfigEnvMap, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig } from "./types";
 
 /**
  * Varsayılan config'i tanımlar. Dönen değer TAM TİPLİ canlı config proxy'sidir.
@@ -16,7 +16,7 @@ export function setConfig<T extends Record<string, any> = ResolvedConfig>(partia
 	return configManager.setConfig<T>(partial, persist);
 }
 
-/** Config'i varsayılanlara döndürür. */
+/** setConfig() ile yapılan runtime değişikliklerini siler (varsayılan + dosya + ortam değişkenlerine döner). */
 export function resetConfig(reloadFile = true): ResolvedConfig {
 	return configManager.resetConfig(reloadFile);
 }
@@ -41,7 +41,10 @@ export function configPath(): string {
 	return configManager.configPath();
 }
 
-/** Anlık config'i config.jsonc dosyasına yazar. */
+/**
+ * config.jsonc dosyasını yazar. Değer verilmezse dosyadaki değerler + runtime değişiklikleri yazılır.
+ * Ortam değişkenlerinden gelen değerler dosyaya yazılmaz. Mevcut yorumlar korunur.
+ */
 export function writeConfig(value?: Record<string, any>): void {
 	configManager.writeFile(value);
 }
@@ -113,5 +116,5 @@ export const config: ConfigFacade = new Proxy({} as Record<string, any>, {
 export const data: ResolvedConfig = configValues;
 
 export { configManager, ConfigManager };
-export type { ConfigChangeListener, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig };
+export type { ConfigChangeListener, ConfigEnvMap, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig };
 export default config;

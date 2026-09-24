@@ -1,6 +1,6 @@
 import sql, { type ConnectionPool, type Request, type Transaction, type config as MssqlConfig } from "mssql";
 
-import { config } from "../../config";
+import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
 import { BaseService } from "./Base.Service";
 
@@ -29,7 +29,7 @@ export class MssqlService extends BaseService<sql.IResult<any>> {
 			MssqlService.connecting = new sql.ConnectionPool(MssqlService.getPoolConfig())
 				.connect()
 				.then(pool => {
-					pool.on("error", err => log.error("MssqlService: unexpected error on idle client", err));
+					pool.on("error", err => log.error("MssqlService: boştaki bağlantıda beklenmeyen hata", err));
 					MssqlService.pool = pool;
 					return pool;
 				})
@@ -41,31 +41,37 @@ export class MssqlService extends BaseService<sql.IResult<any>> {
 		return MssqlService.connecting;
 	}
 
+	/** Bağlantı ayarları. Boş bırakılan user/password/database alanları gönderilmez. */
 	public static getPoolConfig(): MssqlConfig {
-		const cfg = (config as any)?.database?.mssql ?? {};
+		const cfg = baseCfg().database.mssql;
 
-		// prettier-ignore
 		return {
-			server: cfg.host ?? "localhost",
-			port: cfg.port ?? 1433,
-			user: cfg.user ?? "sa",
-			password: cfg.password ?? "sa",
-			database: cfg.database ?? "master",
+			server: cfg.host,
+			port: cfg.port,
+			user: cfg.user || undefined,
+			password: cfg.password || undefined,
+			database: cfg.database || undefined,
 			options: {
-				encrypt: cfg.encrypt ?? false,
-				trustServerCertificate: cfg.trustServerCertificate ?? true,
+				encrypt: cfg.encrypt,
+				trustServerCertificate: cfg.trustServerCertificate,
 			},
 			pool: {
-				max: cfg.max ?? 20,
-				idleTimeoutMillis: cfg.idleTimeoutMillis ?? 30000,
+				max: cfg.max,
+				idleTimeoutMillis: cfg.idleTimeoutMillis,
 			},
-			connectionTimeout: cfg.connectionTimeoutMillis ?? 5000,
-		} as MssqlConfig;
+			connectionTimeout: cfg.connectionTimeoutMillis,
+		};
 	}
 
 	/** BaseService instance metodu istediği için static getPoolConfig()'e köprü. */
 	getPoolConfig(): MssqlConfig {
 		return MssqlService.getPoolConfig();
+	}
+
+	/** Pool'u kurar ve bağlantıyı doğrular. */
+	async connect(): Promise<void> {
+		const pool = await this.getPool();
+		await pool.request().query("SELECT 1");
 	}
 
 	/**
@@ -118,18 +124,22 @@ export class MssqlService extends BaseService<sql.IResult<any>> {
 			const pool = await this.getPool();
 			await pool.request().query("SELECT 1");
 			return true;
-		} catch {
+		} catch (err) {
+			log.warn("MssqlService: healthCheck başarısız.", err);
 			return false;
 		}
 	}
 
-	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. */
+	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. İdempotent; süren bir bağlantı denemesi varsa onu da bekler. */
 	async close(): Promise<void> {
-		if (MssqlService.pool) {
-			await MssqlService.pool.close();
-			MssqlService.pool = null;
-			MssqlService.instance = null;
-			log.info("Mssql pool closed");
+		if (MssqlService.connecting) await MssqlService.connecting.catch(() => undefined);
+
+		const pool = MssqlService.pool;
+		MssqlService.pool = null;
+		MssqlService.instance = null;
+		if (pool) {
+			await pool.close();
+			log.info("MssqlService: pool kapatıldı.");
 		}
 	}
 

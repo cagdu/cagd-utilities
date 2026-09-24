@@ -37,3 +37,52 @@ export function deepClone<T>(value: T): T {
 	}
 	return value;
 }
+
+/** Derin eşitlik (JSON uyumlu değerler için). Anahtar SIRASINA duyarlı değildir. */
+export function deepEqual(a: unknown, b: unknown): boolean {
+	if (a === b) return true;
+	if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+	if (isPlainObject(a) && isPlainObject(b)) {
+		const keys = Object.keys(a);
+		if (keys.length !== Object.keys(b).length) return false;
+		return keys.every(key => key in b && deepEqual(a[key], b[key]));
+	}
+	return false;
+}
+
+/** "a.b.c" yolundaki değeri okur. Yol yoksa `undefined`. */
+export function getPath(obj: unknown, path: string[]): unknown {
+	let cur: unknown = obj;
+	for (const key of path) {
+		if (!isPlainObject(cur)) return undefined;
+		cur = cur[key];
+	}
+	return cur;
+}
+
+/** "a.b.c" yoluna değer yazar, ara objeleri oluşturur (mutasyon yapar). */
+export function setPath(obj: Record<string, unknown>, path: string[], value: unknown): void {
+	let cur = obj;
+	path.slice(0, -1).forEach(key => {
+		if (!isPlainObject(cur[key])) cur[key] = {};
+		cur = cur[key] as Record<string, unknown>;
+	});
+	cur[path[path.length - 1]] = value;
+}
+
+/**
+ * `defaults`'ta olup `source`'ta HİÇ bulunmayan anahtarların en üst seviye
+ * yollarını döner. İki tarafta da obje olan alanlarda derine iner; tipi farklı
+ * olan alanlar kullanıcının bilinçli değişikliği sayılır, eksik sayılmaz.
+ * Anahtar sırasına duyarlı değildir.
+ */
+export function findMissingPaths(defaults: unknown, source: unknown, prefix: string[] = []): string[][] {
+	if (!isPlainObject(defaults) || !isPlainObject(source)) return [];
+
+	const missing: string[][] = [];
+	for (const key of Object.keys(defaults)) {
+		if (!(key in source)) missing.push([...prefix, key]);
+		else missing.push(...findMissingPaths(defaults[key], source[key], [...prefix, key]));
+	}
+	return missing;
+}

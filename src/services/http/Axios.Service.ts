@@ -1,94 +1,118 @@
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, CreateAxiosDefaults, InternalAxiosRequestConfig } from "axios";
 
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import https from "node:https";
 
-import { config } from "../../config";
+import { baseCfg, isDebugEnabled } from "../../config/access";
 import { log } from "../../util/logger";
 
 export interface AxiosServiceOptions {
 	name: string;
 	agent?: https.AgentOptions;
+	/** axios.create() seçenekleri. Buradaki `timeout` config'teki genel `services.axios.timeout`'u ezer. */
 	instance?: CreateAxiosDefaults;
 }
 
-export type AxiosErrorCode = "ERR_BAD_OPTION_VALUE" | "ERR_BAD_OPTION" | "ERR_NOT_SUPPORT" | "ERR_DEPRECATED" | "ERR_INVALID_URL" | "ECONNABORTED" | "ERR_CANCELED" | "ETIMEDOUT" | "ERR_NETWORK" | "ERR_FR_TOO_MANY_REDIRECTS" | "ERR_BAD_RESPONSE" | "ERR_BAD_REQUEST";
+export type AxiosErrorCode =
+	| "ERR_BAD_OPTION_VALUE"
+	| "ERR_BAD_OPTION"
+	| "ERR_NOT_SUPPORT"
+	| "ERR_DEPRECATED"
+	| "ERR_INVALID_URL"
+	| "ECONNABORTED"
+	| "ERR_CANCELED"
+	| "ETIMEDOUT"
+	| "ERR_NETWORK"
+	| "ERR_FR_TOO_MANY_REDIRECTS"
+	| "ERR_BAD_RESPONSE"
+	| "ERR_BAD_REQUEST";
 
-export interface InterceptorError {
-	error: boolean;
-	inResponse: boolean;
-	details: {
-		message: string;
-		name: string;
-		stack: string;
-		config: object;
-		code: AxiosErrorCode | string;
-	};
+/**
+ * AxiosService'in fırlattığı hata. Gerçek bir `Error`'dur (stack trace korunur).
+ *
+ *   try { await http.request({ url: "/x" }); }
+ *   catch (err) {
+ *       if (err instanceof AxiosServiceError) err.status, err.code, err.inResponse, err.details.response?.data;
+ *   }
+ */
+export class AxiosServiceError extends Error {
+	/** Geriye dönük uyumluluk: eski `{ error: true, ... }` şekli. */
+	readonly error = true as const;
+	/** Hata sunucudan gelen bir cevapla mı oluştu (true), yoksa istek hiç cevap alamadan mı (false)? */
+	readonly inResponse: boolean;
+	readonly code: AxiosErrorCode | string;
+	/** HTTP durum kodu (cevap yoksa null). */
+	readonly status: number | null;
+	/** Servis adı (AxiosServiceOptions.name). */
+	readonly service: string;
+	/** Orijinal axios hatası. */
+	readonly details: AxiosError;
+
+	constructor(service: string, details: AxiosError, inResponse: boolean) {
+		super(details.message, { cause: details });
+		this.name = "AxiosServiceError";
+		this.service = service;
+		this.details = details;
+		this.inResponse = inResponse;
+		this.code = details.code ?? "UNKNOWN";
+		this.status = details.response?.status ?? null;
+	}
 }
+
+/** @deprecated `AxiosServiceError` kullanın. */
+export type InterceptorError = AxiosServiceError;
 
 export class AxiosService {
 	private agent: https.Agent;
 	private instance: AxiosInstance;
-	private name = "Local";
+	private name: string;
 
 	constructor(opt: AxiosServiceOptions) {
-		this.agent = this.createAgent(opt.agent);
-		this.instance = this.createInstance(opt.instance);
 		this.name = opt.name;
+		this.agent = new https.Agent({ ...(opt.agent ?? {}) });
+		this.instance = axios.create({ httpsAgent: this.agent, timeout: baseCfg().services.axios.timeout, ...(opt.instance ?? {}) });
 
 		this.setupInterceptors();
-	}
-
-	private createAgent(opt?: https.AgentOptions): https.Agent {
-		return new https.Agent({ ...(typeof opt === "object" ? opt : {}) });
-	}
-
-	private createInstance(opt?: CreateAxiosDefaults): AxiosInstance {
-		return axios.create({ httpsAgent: this.agent, ...(typeof opt === "object" ? opt : {}), timeout: (config as any)?.services?.axios?.timeout ?? 3000 });
 	}
 
 	private setupInterceptors() {
 		this.instance.interceptors.request.use(
 			(request: InternalAxiosRequestConfig) => {
-				request.headers.set("User-Agent", false);
+				const userAgent = baseCfg().services.axios.userAgent;
+				if (userAgent === false) request.headers.set("User-Agent", false);
+				else if (userAgent && !request.headers.has("User-Agent")) request.headers.set("User-Agent", userAgent);
 				return request;
 			},
-			(error: any): Promise<InterceptorError> => {
-				if ((config as any)?.dev) void log.error("AxiosService:" + this.name, "Request Interceptors Error", error);
-				return Promise.reject({ error: true, inResponse: false, details: error });
+			(error: unknown) => {
+				const err = this.normalizeRequestError(error);
+				if (baseCfg().dev) log.error(`AxiosService:${this.name}`, "İstek hazırlanırken hata:", err.message);
+				return Promise.reject(err);
 			},
 		);
 		this.instance.interceptors.response.use(
 			res => res,
-			(error: any): Promise<InterceptorError> => {
-				if ((config as any)?.dev) void log.error("AxiosService:" + this.name, "Response Interceptors Error.", `Code: ${error?.code}`);
-				return Promise.reject({ error: true, inResponse: true, details: error });
+			(error: unknown) => {
+				const err = this.normalizeRequestError(error);
+				if (baseCfg().dev) log.error(`AxiosService:${this.name}`, `İstek başarısız. Kod: ${err.code}${err.status ? `, HTTP ${err.status}` : ""}`);
+				return Promise.reject(err);
 			},
 		);
 	}
 
-	isAxiosRequestError = (error: unknown): error is InterceptorError => {
-		if (!error || typeof error !== "object") return false;
-		if (!("error" in error) || !("details" in error)) return false;
+	isAxiosRequestError = (error: unknown): error is AxiosServiceError => error instanceof AxiosServiceError;
 
-		const details = (error as InterceptorError).details;
-		return typeof details?.code === "string";
-	};
+	/** Herhangi bir hatayı `AxiosServiceError`'a çevirir. */
+	normalizeRequestError = (error: unknown, inResponse?: boolean): AxiosServiceError => {
+		if (error instanceof AxiosServiceError) return error;
 
-	normalizeRequestError = (error: unknown): InterceptorError => {
-		if (this.isAxiosRequestError(error)) return error;
+		let details: AxiosError;
+		if (axios.isAxiosError(error)) details = error;
+		else if (error instanceof Error) {
+			details = new AxiosError(error.message, "UNKNOWN");
+			details.stack = error.stack;
+		} else details = new AxiosError("Beklenmeyen AxiosService hatası", "UNKNOWN");
 
-		return {
-			error: true,
-			inResponse: false,
-			details: {
-				message: error instanceof Error ? error.message : "Unexpected Axios Service Error",
-				name: error instanceof Error ? error.name : "UnknownError",
-				stack: error instanceof Error ? (error.stack ?? "") : "",
-				config: {},
-				code: "UNKNOWN",
-			},
-		};
+		return new AxiosServiceError(this.name, details, inResponse ?? Boolean(details.response));
 	};
 
 	/** Alt seviye axios instance'ına erişim. */
@@ -97,7 +121,7 @@ export class AxiosService {
 	}
 
 	async request<T = any>(cfg: AxiosRequestConfig): Promise<AxiosResponse<T>> {
-		if ((config as any)?.dev && ((config as any)?.debug ?? []).find((x: string) => x === "AxiosService" || x === "*")) void log.debug("AxiosService:" + this.name, "Request going with config", cfg);
+		if (isDebugEnabled("AxiosService")) log.debug(`AxiosService:${this.name}`, "İstek gönderiliyor:", cfg);
 		return this.instance.request<T>(cfg);
 	}
 }

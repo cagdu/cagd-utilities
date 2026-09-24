@@ -1,6 +1,6 @@
 import { Pool, type PoolClient, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
 
-import { config } from "../../config";
+import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
 import { BaseService } from "./Base.Service";
 
@@ -10,10 +10,6 @@ export class PostgresService extends BaseService<QueryResult> {
 
 	private constructor() {
 		super();
-		if (!PostgresService.pool) {
-			PostgresService.pool = new Pool(PostgresService.getPoolConfig());
-			PostgresService.pool.on("error", err => log.error("PostgresService: unexpected error on idle client", err));
-		}
 	}
 
 	public static getInstance(): PostgresService {
@@ -21,33 +17,48 @@ export class PostgresService extends BaseService<QueryResult> {
 		return PostgresService.instance;
 	}
 
+	/** Pool lazy kurulur: ilk sorguda. */
 	private getPool(): Pool {
-		if (!PostgresService.pool) throw new Error("Postgres pool is not initialized");
+		if (!PostgresService.pool) {
+			PostgresService.pool = new Pool(PostgresService.getPoolConfig());
+			PostgresService.pool.on("error", err => log.error("PostgresService: boştaki bağlantıda beklenmeyen hata", err));
+		}
 		return PostgresService.pool;
 	}
 
+	/**
+	 * Bağlantı ayarları. `database.postgres.url` (env: DATABASE_URL) doluysa o kullanılır.
+	 * Boş bırakılan user/password/database alanları pg'nin kendi varsayılanlarına bırakılır.
+	 */
 	public static getPoolConfig(): PoolConfig {
-		const cfg = (config as any)?.database?.postgres ?? {};
+		const cfg = baseCfg().database.postgres;
+		const common: PoolConfig = {
+			max: cfg.max,
+			idleTimeoutMillis: cfg.idleTimeoutMillis,
+			connectionTimeoutMillis: cfg.connectionTimeoutMillis,
+			ssl: (cfg.ssl || undefined) as PoolConfig["ssl"],
+		};
 
-		if (process.env.DATABASE_URL && !cfg.host) return { connectionString: process.env.DATABASE_URL } as PoolConfig;
+		if (cfg.url) return { connectionString: cfg.url, ...common };
 
-		// prettier-ignore
 		return {
-			host: cfg.host ?? "localhost",
-			port: cfg.port ?? 5432,
-			user: cfg.user ?? "postgres",
-			password: cfg.password ?? "postgres",
-			database: cfg.database ?? "postgres",
-			max: cfg.max ?? 20,
-			idleTimeoutMillis: cfg.idleTimeoutMillis ?? 30000,
-			connectionTimeoutMillis: cfg.connectionTimeoutMillis ?? 5000,
-			ssl: cfg.ssl ?? undefined,
-		} as PoolConfig;
+			host: cfg.host,
+			port: cfg.port,
+			user: cfg.user || undefined,
+			password: cfg.password || undefined,
+			database: cfg.database || undefined,
+			...common,
+		};
 	}
 
 	/** BaseService instance metodu istediği için static getPoolConfig()'e köprü. */
 	getPoolConfig(): PoolConfig {
 		return PostgresService.getPoolConfig();
+	}
+
+	/** Pool'u kurar ve bağlantıyı doğrular. */
+	async connect(): Promise<void> {
+		await this.getPool().query("SELECT 1");
 	}
 
 	/** Tek seferlik sorgular için. Bağlantıyı otomatik alır ve bırakır. */
@@ -86,18 +97,20 @@ export class PostgresService extends BaseService<QueryResult> {
 		try {
 			await this.getPool().query("SELECT 1");
 			return true;
-		} catch {
+		} catch (err) {
+			log.warn("PostgresService: healthCheck başarısız.", err);
 			return false;
 		}
 	}
 
-	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. */
+	/** Uygulama kapanırken (SIGTERM/SIGINT) çağrılmalı. İdempotent. */
 	async close(): Promise<void> {
-		if (PostgresService.pool) {
-			await PostgresService.pool.end();
-			PostgresService.pool = null;
-			PostgresService.instance = null;
-			log.info("PostgreSQL pool closed");
+		const pool = PostgresService.pool;
+		PostgresService.pool = null;
+		PostgresService.instance = null;
+		if (pool) {
+			await pool.end();
+			log.info("PostgresService: pool kapatıldı.");
 		}
 	}
 }

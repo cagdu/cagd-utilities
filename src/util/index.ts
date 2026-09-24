@@ -2,8 +2,9 @@
  * ============================================================
  *  util  —  GENEL YARDIMCILAR
  * ============================================================
- *   util.date.getLocalDate()
+ *   util.date.getLocalISO()
  *   util.http.successResponse()
+ *   util.http.ApiError / util.http.healthRouter()
  *   util.log.info()
  */
 import * as date from "./date";
