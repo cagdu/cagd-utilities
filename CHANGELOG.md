@@ -2,6 +2,23 @@
 
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x sürümlerinde kırıcı değişiklikler minor artışla yapılır.
 
+## [Unreleased]
+
+### Eklenenler
+
+- `util.list`: ortak liste/sayfalama sözleşmesi. `createListQuerySchema(z, { sorts, defaultSort, defaultOrder, maxLimit, defaultLimit, filters })`
+  (zod parametre olarak alınır), `booleanQuery(z)`, keyset cursor (`encodeCursor`/`decodeCursor`, sort/order/filtre uyuşmazlığında
+  `400 INVALID_INPUT`), `filtersHash`, Prisma'dan bağımsız `keysetWhere`/`orderBy`/`pageArgs`, `buildPage` ve uçtan uca `paginate`. `Page<T>` tipi.
+- `util.http.errorHandler`: `ZodError` → `400 INVALID_INPUT` (`issues[0].message`, `data.path`); Prisma `P2002` → `409 CONFLICT`,
+  `P2025` → `404 NOT_FOUND` (duck typing; zod/Prisma import edilmez). Aynı eşleme `util.http.toApiError(err)` olarak da dışa aktarıldı.
+- `util.http.validate(schema, value)`: doğrulama hatasında handler ile aynı `ApiError`'u fırlatır.
+- `util.http.getClientIp(req, { trustProxy, trustedForwardHeader })`: varsayılan soket adresi; başlığa yalnızca açık güvenle bakılır.
+- `util.http.createRequestIdMiddleware({ trustIncoming })` ve `createExpressApp({ requestId: { trustIncoming } })`: gelen `X-Request-Id`'ye koşullu güven.
+
+### Değişenler
+
+- `errorHandler` 500 hatalarını loglarken yöntem ve yolu da yazar.
+
 ## [0.1.0] - 2026-09-24
 
 [docs/YAPILACAKLAR.md](docs/YAPILACAKLAR.md) listesindeki tüm maddeler uygulandı.

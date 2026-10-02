@@ -117,7 +117,7 @@ src/
     http/              AxiosService, WebService, createExpressApp
     Mail.Service.ts    MailService
     Redis.Service.ts   RedisService
-  util/              date, logger, http (cevap standardı, ApiError, middleware'ler, healthRouter)
+  util/              date, logger, http (cevap standardı, ApiError, middleware'ler, healthRouter), list (liste sözleşmesi)
 examples/            tüketici projeye kopyalanacak örnek giriş noktası
 test/                otomatik testler (node:test)
 ```
@@ -408,7 +408,67 @@ util.http.successResponse({ data }); // API cevap standardı
 util.http.ApiError; // standart hata sınıfı
 util.http.healthRouter(); // GET /health
 util.http.requestIdMiddleware / errorHandler / notFoundHandler; // kendi Express uygulaman için
+util.http.createRequestIdMiddleware({ trustIncoming: req => !!req.gateway }); // gelen X-Request-Id'ye koşullu güven
+util.http.validate(schema, value); // safeParse + hata ise 400 INVALID_INPUT ApiError
+util.http.getClientIp(req, { trustedForwardHeader: req => !!req.gateway }); // varsayılan: soket adresi
 ```
+
+**Hata eşlemesi (`errorHandler`):** `ApiError` → kendi status/code'u · `ZodError` (duck typing, zod import edilmez) → `400 INVALID_INPUT`,
+mesaj `issues[0].message`, `data: { path }` · Prisma `P2002` → `409 CONFLICT`, `P2025` → `404 NOT_FOUND` · diğer her şey → `500 INTERNAL_ERROR`
+(iç mesaj sızdırılmaz, loglanır). Aynı eşleme `util.http.toApiError(err)` ile kendi handler'ında da kullanılabilir.
+
+**İstemci IP (`getClientIp`):** başlıklara varsayılan olarak **güvenilmez**; `X-Forwarded-For`'un ilk değeri yalnızca `trustedForwardHeader(req)`
+`true` dönerse kullanılır (ör. kimliği doğrulanmış bir ağ geçidi). `trustProxy: true` Express'in `req.ip`'sini kullanır. `::ffff:` öneki kırpılır.
+
+### Liste sözleşmesi (`util.list`)
+
+Tüm liste uçları aynı sözleşmeyi kullanır:
+
+```
+İstek: limit (1-100, vars. 20) · cursor XOR page (1'den başlar) · sort · order (asc|desc) · q (1-200) · + uca özel filtreler
+Cevap: { items, nextCursor, hasMore, limit, page?, total?, totalPages? }   // page/total/totalPages yalnızca page modunda
+```
+
+- `cursor` opak bir **keyset** işaretçisidir (base64url JSON: son satırın sıralama değeri + kimliği + sort/order + filtre özeti).
+  Eşit sıralama değerlerinde `Id` ikincil anahtardır; sayfalar arasında atlama/tekrar olmaz. Sıralama, yön ya da filtreler değişince eski cursor
+  `400 INVALID_INPUT` ("Invalid cursor") ile reddedilir. `Date`, `bigint` ve Decimal değerleri kayıpsız taşınır.
+- `nextCursor` her iki modda da döner; `null` ise liste bitmiştir.
+- Kütüphane zod'a ve Prisma'ya **bağımlı değildir**: zod örneği parametre olarak verilir, Prisma yardımcıları düz nesne üretir.
+
+Express + Prisma örneği:
+
+```ts
+import { z } from "zod";
+import { util } from "cagd-utilities";
+
+const listSchema = util.list.createListQuerySchema(z, {
+	sorts: ["createdAt", "name"],
+	defaultSort: "createdAt",
+	defaultOrder: "desc",
+	filters: { isEnabled: util.list.booleanQuery(z).optional() },
+});
+const SORT_FIELDS = { createdAt: "CreatedAt", name: "Name" } as const;
+
+router.get("/items", async (req, res) => {
+	const query = listSchema.parse(req.query); // ZodError → errorHandler → 400 INVALID_INPUT
+	const where = {
+		...(query.isEnabled !== undefined && { IsEnabled: query.isEnabled }),
+		...(query.q && { OR: [{ Name: { contains: query.q } }] }),
+	};
+	const page = await util.list.paginate(query, {
+		field: SORT_FIELDS[query.sort],
+		findMany: args => prisma.items.findMany({ ...args, where: { AND: [where, args.where ?? {}] } }),
+		count: () => prisma.items.count({ where }),
+		map: row => ({ Id: row.Id, Name: row.Name }),
+	});
+	res.success({ data: page });
+});
+```
+
+Daha alt seviye yapı taşları: `encodeCursor` / `decodeCursor(raw, { sort, order, filtersHash })`, `filtersHash(query)`,
+`keysetWhere({ field, idField, order, cursor, nullable, nulls })`, `orderBy({ field, idField, order })`, `pageArgs({ page, limit })`,
+`buildPage({ rows, limit, mode, sort, order, getCursorValue, total })`. NULL olabilen sıralama alanlarında `nullable: true` verin;
+`nulls` NULL'ın sıralamadaki yeridir: `"low"` (vars.; SQL Server/MySQL/SQLite) ya da `"high"` (PostgreSQL).
 
 **Tarih standardı:** makineler arası zaman damgaları (API cevabındaki `transaction.date`, loglar) UTC ISO 8601'dir (`…Z`). Yerel saat gerekiyorsa `getLocalISO()` (ofsetli). `getLocalDate()` ofset içermez; sadece gösterim içindir.
 

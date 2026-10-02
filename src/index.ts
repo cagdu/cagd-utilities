@@ -64,7 +64,23 @@ export type {
 	WebServiceOptions,
 } from "./services";
 export type { ApiError } from "./util/http";
-export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse, ErrorOptions, HealthRouterOptions, SuccessOptions, Transaction } from "./util/http";
+export type { ApiErrorResponse, ApiResponse, ApiSuccessResponse, ClientIpOptions, ErrorOptions, HealthRouterOptions, RequestIdOptions, SuccessOptions, Transaction } from "./util/http";
+export type {
+	BuildPageOptions,
+	CursorPayload,
+	CursorValue,
+	FindManyArgs,
+	KeysetOptions,
+	ListMode,
+	ListQuery,
+	ListQueryBase,
+	ListQuerySchemaOptions,
+	NullsPosition,
+	Page,
+	PaginateOptions,
+	ParseableSchema,
+	SortOrder,
+} from "./util/list";
 export type { Logger } from "./util/logger";
 
 // ------------------------------------------------------------------

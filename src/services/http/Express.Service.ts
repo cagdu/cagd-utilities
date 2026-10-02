@@ -9,7 +9,14 @@ import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
 import { responserMiddleware } from "../../util/http/Response";
 import { httpErrorCode } from "../../util/http/ApiError";
-import { errorHandler as defaultErrorHandler, notFoundHandler as defaultNotFoundHandler, requestIdMiddleware, sendError } from "../../util/http/middleware";
+import {
+	createRequestIdMiddleware,
+	errorHandler as defaultErrorHandler,
+	notFoundHandler as defaultNotFoundHandler,
+	requestIdMiddleware,
+	sendError,
+	type RequestIdOptions,
+} from "../../util/http/middleware";
 
 export interface ExpressAppOptions {
 	/** Uygulamaya bağlanacak router(lar). */
@@ -25,8 +32,11 @@ export interface ExpressAppOptions {
 	staticDir?: string | false;
 	/** res.success / res.error helper'ları eklensin mi? Varsayılan: true */
 	responder?: boolean;
-	/** Her isteğe X-Request-Id verilsin mi? Varsayılan: true */
-	requestId?: boolean;
+	/**
+	 * Her isteğe X-Request-Id verilsin mi? Varsayılan: true.
+	 * Nesne verilirse `createRequestIdMiddleware` seçenekleri olarak kullanılır (ör. `{ trustIncoming: req => ... }`).
+	 */
+	requestId?: boolean | RequestIdOptions;
 	/** Tanımsız endpoint'ler için özel handler. Varsayılan: standart 404 cevabı. */
 	notFoundHandler?: RequestHandler;
 	/** Özel hata handler'ı. Varsayılan: `util.http.errorHandler` (ApiError'ı tanır). */
@@ -51,7 +61,7 @@ export function createExpressApp(options: ExpressAppOptions = {}): Express {
 
 	for (const middleware of options.beforeMiddlewares ?? []) app.use(middleware);
 
-	if (options.requestId !== false) app.use(requestIdMiddleware);
+	if (options.requestId !== false) app.use(typeof options.requestId === "object" ? createRequestIdMiddleware(options.requestId) : requestIdMiddleware);
 	if (options.responder !== false) app.use(responserMiddleware);
 
 	app.use(helmet(web.helmet as Parameters<typeof helmet>[0])).use(cors(web.cors));
