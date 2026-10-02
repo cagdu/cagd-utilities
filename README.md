@@ -499,7 +499,8 @@ const r = await util.redis.consume("carts:create", userId, { windowSec: 3600, ma
 
 - Rate limit hiçbir başlık/gövde loglamaz; kimlik Redis anahtarında da sha256 özeti olarak tutulur. Test ortamında atlamak uygulamanın kararıdır (`skip`).
 - Süreç içi yedek yalnızca Redis erişilemezken yazılanları tutar. Kesinti sırasında yapılan `del()` Redis'e ulaşmaz; Redis dönünce eski değer TTL bitene
-  kadar görülebilir. Güvenlikle ilgili önbelleklerde (izin, oturum durumu) **kısa TTL** kullanın. Süreç içi kilit tek kopya varsayar.
+  kadar görülebilir. Güvenlikle ilgili önbelleklerde (izin, oturum durumu) **kısa TTL** kullanın;
+  `memoryTtlSec` süreç içi yedekteki süreyi ayrıca sınırlar (çok kopyalı kurulumda diğer kopyaların `del()`'i bu belleğe ulaşmaz). Süreç içi kilit tek kopya varsayar.
 
 **Tarih standardı:** makineler arası zaman damgaları (API cevabındaki `transaction.date`, loglar) UTC ISO 8601'dir (`…Z`). Yerel saat gerekiyorsa `getLocalISO()` (ofsetli). `getLocalDate()` ofset içermez; sadece gösterim içindir.
 

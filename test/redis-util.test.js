@@ -182,6 +182,19 @@ suite("komutta kopan Redis → süreç içi yedek", {
 	},
 });
 
+describe("util.redis cache memoryTtlSec", () => {
+	afterEach(() => R.setRedisClient(undefined));
+
+	test("süreç içi yedekte değer memoryTtlSec'ten uzun tutulmaz", async () => {
+		R.setRedisClient(null);
+		const cache = R.createCache({ namespace: uniq("t:memttl"), ttlSec: 60, memoryTtlSec: 1 });
+		await cache.set("k", 1);
+		assert.equal(await cache.get("k"), 1);
+		await sleep(1100);
+		assert.equal(await cache.get("k"), undefined);
+	});
+});
+
 describe("util.redis uyarı kısıtlaması", () => {
 	afterEach(() => R.setRedisClient(undefined));
 

@@ -16,7 +16,7 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 - `util.http.createRequestIdMiddleware({ trustIncoming })` ve `createExpressApp({ requestId: { trustIncoming } })`: gelen `X-Request-Id`'ye koşullu güven.
 
 - `util.redis`: Redis tabanlı ilkel yapılar; Redis erişilemezken süreç içi yedeğe geçer (dakikada bir uyarı).
-  `createCache({ namespace, ttlSec, memoryMax })` (`get`/`set`/`del`/`getOrLoad`, single-flight), `acquireLock`/`withLock` (jetonlu, Lua ile güvenli
+  `createCache({ namespace, ttlSec, memoryMax, memoryTtlSec })` (`get`/`set`/`del`/`getOrLoad`, single-flight), `acquireLock`/`withLock` (jetonlu, Lua ile güvenli
   bırakma/uzatma), `onceEvery(key, windowSec)`, `rateLimiter({ name, windowSec, max, key, skip })` (Express; `Retry-After` + `RateLimit-*`) ve
   `consume(name, identity, opts)`. `setRedisClient()`/`getRedisClient()`. Komutlar `sendCommand` ile; node-redis v4–v6 uyumlu.
 

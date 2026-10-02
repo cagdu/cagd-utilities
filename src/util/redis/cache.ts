@@ -7,6 +7,12 @@ export interface CacheOptions {
 	ttlSec: number;
 	/** Redis erişilemezken kullanılan süreç içi önbelleğin en fazla kayıt sayısı. Varsayılan: 1000. */
 	memoryMax?: number;
+	/**
+	 * Süreç içi yedekte bir değerin en fazla tutulacağı süre (saniye). Varsayılan: `ttlSec`.
+	 * Çok kopyalı kurulumlarda başka kopyaların geçersiz kılmaları (`del`) bu kopyanın belleğine ulaşmaz;
+	 * izin/oturum gibi güvenlikle ilgili önbelleklerde kısa tutun (ör. 5).
+	 */
+	memoryTtlSec?: number;
 }
 
 export interface Cache {
@@ -36,6 +42,7 @@ export function createCache(options: CacheOptions): Cache {
 	const { namespace } = options;
 	const defaultTtl = Math.max(1, Math.floor(options.ttlSec));
 	const memory = new MemoryStore<Wrapped>(options.memoryMax ?? 1000);
+	const memoryTtlCap = options.memoryTtlSec === undefined ? Infinity : Math.max(1, Math.floor(options.memoryTtlSec));
 	const inflight = new Map<string, Promise<unknown>>();
 	const fullKey = (key: string) => `${namespace}:${key}`;
 
@@ -69,7 +76,7 @@ export function createCache(options: CacheOptions): Cache {
 				warnThrottled(`cache:${namespace}`, "Redis'e yazılamadı, süreç içi önbellek kullanılıyor", err);
 			}
 		}
-		memory.set(k, wrapped, ttl * 1000);
+		memory.set(k, wrapped, Math.min(ttl, memoryTtlCap) * 1000);
 	}
 
 	return {
