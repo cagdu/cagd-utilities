@@ -223,9 +223,9 @@ const NON_FILTER_KEYS = new Set(["limit", "cursor", "page", "sort", "order"]);
  * Filtrelerin (ve `q`'nun) kısa, kararlı özeti. `query` doğrudan verilebilir: `limit`/`cursor`/`page`/`sort`/`order` yok sayılır.
  * Filtre yoksa `""`.
  */
-export function filtersHash(query: Record<string, unknown>): string {
+export function filtersHash(query: object): string {
 	const filters: Record<string, unknown> = {};
-	for (const [k, v] of Object.entries(query)) if (!NON_FILTER_KEYS.has(k) && v !== undefined) filters[k] = v;
+	for (const [k, v] of Object.entries(query as Record<string, unknown>)) if (!NON_FILTER_KEYS.has(k) && v !== undefined) filters[k] = v;
 	if (Object.keys(filters).length === 0) return "";
 	return createHash("sha256").update(stableStringify(filters)).digest("base64url").slice(0, 16);
 }
@@ -357,9 +357,9 @@ export interface PaginateOptions<Row, Out> {
  * `createListQuerySchema` çıktısıyla uçtan uca sayfalama: cursor'ı doğrular (sort/order/filtre),
  * keyset `where` + `orderBy` + `take`/`skip` üretir, sonucu `Page<T>`'ye çevirir.
  */
-export async function paginate<Row, Out = Row>(query: ListQueryBase<string> & Record<string, unknown>, options: PaginateOptions<Row, Out>): Promise<Page<Out>> {
+export async function paginate<Row, Out = Row>(query: ListQueryBase<string>, options: PaginateOptions<Row, Out>): Promise<Page<Out>> {
 	const idField = options.idField ?? "Id";
-	const hash = filtersHash(query);
+	const hash = filtersHash(query as unknown as Record<string, unknown>);
 	const mode: ListMode = query.page !== undefined ? "page" : "cursor";
 	const order = orderBy({ field: options.field, idField, order: query.order });
 
