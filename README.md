@@ -117,7 +117,7 @@ src/
     http/              AxiosService, WebService, createExpressApp
     Mail.Service.ts    MailService
     Redis.Service.ts   RedisService
-  util/              date, logger, http (cevap standardı, ApiError, middleware'ler, healthRouter), list (liste sözleşmesi)
+  util/              date, logger, http (cevap standardı, ApiError, middleware'ler, healthRouter), list (liste sözleşmesi), redis (önbellek, kilit, onceEvery, rate limit)
 examples/            tüketici projeye kopyalanacak örnek giriş noktası
 test/                otomatik testler (node:test)
 ```
@@ -469,6 +469,37 @@ Daha alt seviye yapı taşları: `encodeCursor` / `decodeCursor(raw, { sort, ord
 `keysetWhere({ field, idField, order, cursor, nullable, nulls })`, `orderBy({ field, idField, order })`, `pageArgs({ page, limit })`,
 `buildPage({ rows, limit, mode, sort, order, getCursorValue, total })`. NULL olabilen sıralama alanlarında `nullable: true` verin;
 `nulls` NULL'ın sıralamadaki yeridir: `"low"` (vars.; SQL Server/MySQL/SQLite) ya da `"high"` (PostgreSQL).
+
+### Redis ilkel yapıları (`util.redis`)
+
+Ortak ilke: **Redis erişilemezken istek düşmez.** Her yapı süreç içi bir yedeğe geçer ve dakikada en fazla bir kez `log.warn` yazar.
+Varsayılan client `service.redis`'tir; yalnızca bağlıysa kullanılır (burada bağlantı açılmaz). Komutlar ham `sendCommand` ile gönderilir,
+node-redis v4/v5/v6 ile çalışır. Farklı bir client için `util.redis.setRedisClient(client)` (`null` → her zaman süreç içi).
+
+```ts
+import { util } from "cagd-utilities";
+
+// Önbellek: JSON, anahtar `namespace:key`; `null` da önbelleğe alınabilir (yok = undefined).
+const perms = util.redis.createCache({ namespace: "perm:global", ttlSec: 60 });
+const list = await perms.getOrLoad(userId, () => loadFromDb(userId)); // aynı anahtar için eşzamanlı yükleme tekilleştirilir
+await perms.del(userId); // izin değişince geçersiz kıl
+
+// Dağıtık kilit: SET NX PX + rastgele jeton; bırakma/uzatma yalnızca jeton eşleşirse (Lua).
+const lock = await util.redis.acquireLock("jobs:cleanup", { ttlMs: 30_000, waitMs: 0 });
+if (lock) try { await work(); await lock.extend(30_000); } finally { await lock.release(); }
+await util.redis.withLock("jobs:cleanup", { ttlMs: 30_000 }, async () => work()); // -> { acquired, result }
+
+// Pencerede bir kez: LastSeenAt'i dakikada bir yaz.
+if (await util.redis.onceEvery(`gateway:lastseen:${id}`, 60)) await touchLastSeen(id);
+
+// Rate limit (sabit pencere, INCR + PEXPIRE atomik). Aşımda ApiError(429, "RATE_LIMITED") + Retry-After, RateLimit-* başlıkları.
+router.post("/login", util.redis.rateLimiter({ name: "auth:login", windowSec: 900, max: 20, key: req => util.http.getClientIp(req), skip: () => isTest }), handler);
+const r = await util.redis.consume("carts:create", userId, { windowSec: 3600, max: 10 }); // { allowed, remaining, resetSec, retryAfterSec }
+```
+
+- Rate limit hiçbir başlık/gövde loglamaz; kimlik Redis anahtarında da sha256 özeti olarak tutulur. Test ortamında atlamak uygulamanın kararıdır (`skip`).
+- Süreç içi yedek yalnızca Redis erişilemezken yazılanları tutar. Kesinti sırasında yapılan `del()` Redis'e ulaşmaz; Redis dönünce eski değer TTL bitene
+  kadar görülebilir. Güvenlikle ilgili önbelleklerde (izin, oturum durumu) **kısa TTL** kullanın. Süreç içi kilit tek kopya varsayar.
 
 **Tarih standardı:** makineler arası zaman damgaları (API cevabındaki `transaction.date`, loglar) UTC ISO 8601'dir (`…Z`). Yerel saat gerekiyorsa `getLocalISO()` (ofsetli). `getLocalDate()` ofset içermez; sadece gösterim içindir.
 

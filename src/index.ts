@@ -82,6 +82,7 @@ export type {
 	SortOrder,
 } from "./util/list";
 export type { Logger } from "./util/logger";
+export type { Cache, CacheOptions, ConsumeOptions, ConsumeResult, Lock, LockOptions, RateLimiterOptions, RedisCommandClient } from "./util/redis";
 
 // ------------------------------------------------------------------
 // Default export
