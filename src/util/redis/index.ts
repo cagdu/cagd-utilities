@@ -15,7 +15,7 @@ import { getRedisClient, MemoryStore, warnThrottled } from "./backend";
 export { createCache } from "./cache";
 export { acquireLock, withLock } from "./lock";
 export { consume, rateLimiter } from "./rateLimit";
-export { getRedisClient, resetWarnings, setRedisClient } from "./backend";
+export { getRedisClient, isMemoryModeExplicit, resetWarnings, setRedisClient } from "./backend";
 
 export type { Cache, CacheOptions } from "./cache";
 export type { Lock, LockOptions } from "./lock";

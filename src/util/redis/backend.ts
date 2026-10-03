@@ -23,6 +23,11 @@ export function setRedisClient(client: RedisCommandClient | null | undefined): v
 	override = client;
 }
 
+/** Uygulama süreç içi modu açıkça seçti mi (`setRedisClient(null)`)? Bu modda "Redis yok" uyarıları loglanmaz. */
+export function isMemoryModeExplicit(): boolean {
+	return override === null;
+}
+
 /**
  * Kullanılabilir (bağlı ve hazır) Redis client'ı; yoksa `null` (süreç içi moda geçilir).
  * Varsayılan kaynak `service.redis`: yalnızca daha önce oluşturulup bağlanmışsa kullanılır, burada asla bağlantı açılmaz.

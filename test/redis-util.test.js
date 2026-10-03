@@ -174,6 +174,20 @@ function suite(label, setup) {
 	});
 }
 
+describe("açık süreç içi mod", () => {
+	test("setRedisClient(null) iken kilit 'Redis bağlı değil' uyarısı loglanmaz; undefined iken loglanır", async () => {
+		R.resetWarnings();
+		R.setRedisClient(null);
+		const before = logs.length;
+		const lock = await R.acquireLock(uniq("t:explicit"), { ttlMs: 1000 });
+		await lock.release();
+		assert.equal(logs.slice(before).filter(l => l.text.includes("süreç içi kilit")).length, 0);
+		assert.equal(R.isMemoryModeExplicit(), true);
+		R.setRedisClient(undefined);
+		assert.equal(R.isMemoryModeExplicit(), false);
+	});
+});
+
 suite("Redis'siz, süreç içi", {
 	before: () => R.setRedisClient(null),
 	after: () => R.setRedisClient(undefined),

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { getRedisClient, MemoryStore, warnThrottled } from "./backend";
+import { getRedisClient, isMemoryModeExplicit, MemoryStore, warnThrottled } from "./backend";
 
 export interface LockOptions {
 	/** Kilidin kendiliğinden düşeceği süre (ms). İş bundan uzun sürecekse `extend()` çağırın. */
@@ -37,7 +37,7 @@ async function tryAcquire(name: string, token: string, ttlMs: number): Promise<"
 		} catch (err) {
 			warnThrottled("lock", "Redis erişilemedi, süreç içi kilit kullanılıyor (tek kopya varsayımı)", err);
 		}
-	} else {
+	} else if (!isMemoryModeExplicit()) {
 		warnThrottled("lock", "Redis bağlı değil, süreç içi kilit kullanılıyor (tek kopya varsayımı)");
 	}
 	if (memoryLocks.get(key) !== undefined) return null;

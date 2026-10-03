@@ -4,6 +4,11 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 
 ## [Unreleased]
 
+### Değişenler
+
+- `util.redis`: `setRedisClient(null)` ile süreç içi mod açıkça seçildiyse kilit "Redis bağlı değil" uyarısı loglanmaz (tek kopyalı kurulumlarda her dakika
+  tekrarlanan gürültü). Yeni `isMemoryModeExplicit()`.
+
 ## [0.2.0] - 2026-10-03
 
 Kırıcı değişiklik yok: yalnızca eklemeler; `onceEvery` pencereyi artık milisaniye hassasiyetiyle uygular (tam saniyeli çağrılarda davranış aynı).
