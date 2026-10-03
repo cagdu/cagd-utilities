@@ -64,6 +64,24 @@ describe("PrismaService / service.prisma", () => {
 		assert.equal(service.prisma.provider, "postgres");
 	});
 
+	test("adapterFactory: adapter uygulamadan gelir, poolConfig config'ten", () => {
+		config.manager.setConfig({ database: { provider: "mssql", mssql: { host: "db.local", port: 1500, database: "x" } } });
+		try {
+			const calls = [];
+			const adapter = { fake: true };
+			service.prisma.use(FakePrismaClient, { adapterFactory: ctx => (calls.push(ctx), adapter) });
+			const client = service.prisma.client;
+			assert.equal(client.options.adapter, adapter);
+			assert.equal(calls.length, 1);
+			assert.equal(calls[0].provider, "mssql");
+			assert.equal(calls[0].poolConfig.server, "db.local");
+			assert.equal(calls[0].poolConfig.port, 1500);
+		} finally {
+			config.manager.setConfig({ database: { provider: "postgres" } });
+			service.prisma.use(FakePrismaClient, { adapterFactory: undefined });
+		}
+	});
+
 	test("mssql provider: @prisma/adapter-mssql ile adapter kurulur", () => {
 		config.manager.setConfig({ database: { provider: "mssql" } });
 		try {

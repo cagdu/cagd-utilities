@@ -4,7 +4,18 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+Kırıcı değişiklik yok: yalnızca eklemeler; `onceEvery` pencereyi artık milisaniye hassasiyetiyle uygular (tam saniyeli çağrılarda davranış aynı).
+
 ### Eklenenler
+
+- `service.jobs` (+ `JobRunner`, `computeNextRun`, `scheduleIntervalMs`): kilitli, çakışmasız, düzgün kapanan zamanlanmış işler.
+  `define({ name, every: { seconds | minutes | hours | dailyAtUtc }, lock, runOnStart, timeoutMs, run })`, `status()`, `runNow()`, `reschedule()`, `undefine()`.
+  `ServiceName`'e `"jobs"` eklendi; `service.bootstrap([..., "jobs"])`. Yeni config alanı: `services.jobs.shutdownTimeoutMs` (10000).
+- `PrismaServiceOptions.adapterFactory`: driver adapter'ı uygulama oluşturur (tek dosyalık derlemeler — `bun build --compile` — için; adapter paketi
+  dinamik `require` ile aranmaz).
+- `util.redis.createCache(...).clear()`: namespace'teki tüm anahtarları siler (Redis'te `SCAN MATCH` + `DEL`).
 
 - `util.list`: ortak liste/sayfalama sözleşmesi. `createListQuerySchema(z, { sorts, defaultSort, defaultOrder, maxLimit, defaultLimit, filters })`
   (zod parametre olarak alınır), `booleanQuery(z)`, keyset cursor (`encodeCursor`/`decodeCursor`, sort/order/filtre uyuşmazlığında
@@ -23,6 +34,7 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 ### Değişenler
 
 - `errorHandler` 500 hatalarını loglarken yöntem ve yolu da yazar.
+- `util.redis.onceEvery(key, windowSec)`: `SET NX EX` yerine `SET NX PX`; kesirli saniyeler artık yuvarlanmadan uygulanır.
 
 ## [0.1.0] - 2026-09-24
 

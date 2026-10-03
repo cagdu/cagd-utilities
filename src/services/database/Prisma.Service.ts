@@ -33,6 +33,16 @@ export interface PrismaServiceOptions<TClient = any> {
 	 * - Prisma 7: adapter zorunludur; adapter'sız kullanım sadece `clientOptions: { accelerateUrl }` ile mümkündür.
 	 */
 	disableAdapter?: boolean;
+	/**
+	 * Driver adapter'ı uygulama oluşturur (paket `requireFromApp` ile aranmaz). Bağlantı ayarları yine config'ten gelir:
+	 *
+	 *   import { PrismaMssql } from "@prisma/adapter-mssql";
+	 *   service.prisma.use(PrismaClient, { adapterFactory: ({ poolConfig }) => new PrismaMssql(poolConfig) });
+	 *
+	 * Tek dosyalık derlemelerde (`bun build --compile`, pkg vb.) gereklidir: dinamik `require` ile aranan adapter paketi
+	 * pakete gömülmez, statik import edilen gömülür.
+	 */
+	adapterFactory?: (context: { provider: DatabaseProvider; poolConfig: any }) => any;
 }
 
 /**
@@ -182,6 +192,9 @@ export class PrismaService<TClient = any> {
 	 */
 	private static createAdapter(): any | null {
 		const provider = PrismaService.getProvider();
+		const factory = PrismaService.options.adapterFactory;
+		if (factory) return factory({ provider, poolConfig: provider === "mssql" ? loadMssql().getPoolConfig() : loadPostgres().getPoolConfig() });
+
 		let AdapterCtor: new (poolConfig: any) => any;
 		let poolConfig: any;
 

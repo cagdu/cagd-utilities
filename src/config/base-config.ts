@@ -62,6 +62,9 @@ export const baseConfig = {
 			db: 0,
 			connectRetries: 5,
 		},
+		jobs: {
+			shutdownTimeoutMs: 10000,
+		},
 		mail: {
 			host: "",
 			port: 587,
@@ -190,6 +193,10 @@ export const baseConfigSchema: ConfigSchema<BaseConfig> = {
 			password: "Redis şifresi",
 			db: "Kullanılacak veritabanı indeksi",
 			connectRetries: "İlk bağlantıda kaç deneme sonrası hata verileceği (bağlandıktan sonra sınırsız yeniden denenir)",
+		},
+		jobs: {
+			__self: "Zamanlanmış işler (service.jobs)",
+			shutdownTimeoutMs: "Kapanışta çalışan işlerin bekleneceği süre (milisaniye); sonra iptal sinyali gönderilir",
 		},
 		mail: {
 			__self: "SMTP mail yapılandırması (env: MAIL_HOST, MAIL_PORT, MAIL_SECURE, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM)",

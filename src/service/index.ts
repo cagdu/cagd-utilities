@@ -36,6 +36,8 @@ import type RedisService from "../services/Redis.Service";
 import type WebService from "../services/http/Web.Service";
 import type { WebServiceOptions } from "../services/http/Web.Service";
 import type { Express } from "../services/http/Express.Service";
+import { JobRunner } from "./jobs";
+import type { JobDefinition, JobSchedule, JobStatus, RunNowResult } from "./jobs";
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const load = {
@@ -49,7 +51,7 @@ const load = {
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 /** Hazır servis adları. */
-export type ServiceName = "prisma" | "web" | "redis" | "postgres" | "mssql" | "mail";
+export type ServiceName = "prisma" | "web" | "redis" | "postgres" | "mssql" | "mail" | "jobs";
 
 /** Her hazır servisin ortak arayüzü. */
 export interface ServiceDefiner {
@@ -292,17 +294,64 @@ class MailDefiner extends Definer {
 }
 
 // ------------------------------------------------------------------
+// Zamanlanmış işler  ->  service.jobs
+// ------------------------------------------------------------------
+class JobsDefiner extends Definer {
+	readonly name = "jobs" as const;
+	/** Alt seviye çalıştırıcı (testlerde ayrı örnek için `new JobRunner()`). */
+	readonly runner = new JobRunner();
+
+	/** İş tanımlar; servis çalışıyorsa hemen zamanlanır. Bkz. `JobDefinition`. */
+	define(def: JobDefinition): this {
+		this.runner.define(def);
+		return this;
+	}
+
+	undefine(name: string): boolean {
+		return this.runner.undefine(name);
+	}
+
+	status(): JobStatus[] {
+		return this.runner.status();
+	}
+
+	runNow(name: string): Promise<RunNowResult> {
+		return this.runner.runNow(name);
+	}
+
+	reschedule(name: string, every: JobSchedule): this {
+		this.runner.reschedule(name, every);
+		return this;
+	}
+
+	protected async doStart(): Promise<void> {
+		await this.runner.start();
+	}
+
+	/** Yeni turları durdurur, çalışan turları `services.jobs.shutdownTimeoutMs` kadar bekler. */
+	protected async doStop(): Promise<void> {
+		await this.runner.stop();
+	}
+
+	/** Çalıştırıcı aktif mi? (İş hataları sağlığı etkilemez; ayrıntı için `status()`.) */
+	async healthCheck(): Promise<boolean> {
+		return this.runner.isActive;
+	}
+}
+
+// ------------------------------------------------------------------
 export const prisma = new PrismaDefiner();
 export const web = new WebDefiner();
 export const redis = new RedisDefiner();
 export const postgres = new PostgresDefiner();
 export const mssql = new MssqlDefiner();
 export const mail = new MailDefiner();
+export const jobs = new JobsDefiner();
 
 /** `service.prisma` için okunabilir alias. */
 export const database = prisma;
 
-const registry: Record<ServiceName, ServiceDefiner> = { prisma, web, redis, postgres, mssql, mail };
+const registry: Record<ServiceName, ServiceDefiner> = { prisma, web, redis, postgres, mssql, mail, jobs };
 
 /**
  * Verilen servisleri VERİLEN SIRAYLA başlatır. Bilinmeyen bir ad verilirse hiçbir servis
@@ -460,4 +509,7 @@ export async function bootstrap(names: ServiceName[], options: BootstrapOptions 
 	}
 }
 
-export default { prisma, database, web, redis, postgres, mssql, mail, start, stopAll, healthCheckAll, handleSignals, bootstrap };
+export { JobRunner, computeNextRun, scheduleIntervalMs } from "./jobs";
+export type { JobContext, JobDefinition, JobSchedule, JobStatus, RunNowResult } from "./jobs";
+
+export default { prisma, database, web, redis, postgres, mssql, mail, jobs, start, stopAll, healthCheckAll, handleSignals, bootstrap };

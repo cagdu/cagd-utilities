@@ -55,6 +55,17 @@ function suite(label, setup) {
 			assert.equal(await cache.get("short"), undefined);
 		});
 
+		test("cache.clear: yalnızca kendi namespace'ini boşaltır", async () => {
+			const ns = uniq("t:clear");
+			const cache = R.createCache({ namespace: ns, ttlSec: 30 });
+			const other = R.createCache({ namespace: `${ns}x`, ttlSec: 30 });
+			for (let i = 0; i < 5; i++) await cache.set(`k${i}`, i);
+			await other.set("k0", "kalır");
+			await cache.clear();
+			for (let i = 0; i < 5; i++) assert.equal(await cache.get(`k${i}`), undefined);
+			assert.equal(await other.get("k0"), "kalır");
+		});
+
 		test("cache.getOrLoad: tekilleştirme (single-flight) ve undefined önbelleğe alınmaz", async () => {
 			const cache = R.createCache({ namespace: uniq("t:load"), ttlSec: 30 });
 			let calls = 0;

@@ -11,7 +11,7 @@ import { config, service, services, util } from "cagd-utilities";
 | Namespace  | Alt yol                   | Ne verir?                                                                          |
 | ---------- | ------------------------- | ---------------------------------------------------------------------------------- |
 | `config`   | `cagd-utilities/config`   | `config.data` (değerler) + `config.manager` (yönetim)                              |
-| `service`  | `cagd-utilities/service`  | **Hazır örnekler**: `service.prisma`, `service.web`, `service.redis`, `bootstrap`… |
+| `service`  | `cagd-utilities/service`  | **Hazır örnekler**: `service.prisma`, `service.web`, `service.redis`, `service.jobs`, `bootstrap`… |
 | `services` | `cagd-utilities/services` | **Ham sınıflar**: `PrismaService`, `WebService`, … (root'ta `classes` adıyla da)   |
 | `util`     | `cagd-utilities/util`     | `util.date`, `util.http` (cevap standardı, `ApiError`, `healthRouter`), `util.log` |
 
@@ -286,6 +286,10 @@ await prisma.client.user.findMany(); // tam tipli
 - Provider: `config.data.database.provider` (`"postgres"` | `"mssql"`, env: `DATABASE_TYPE`).
 - Adapter otomatik seçilir (`@prisma/adapter-pg` / `@prisma/adapter-mssql`), bağlantı ayarları config'ten okunur.
 - `use()` tekrar çağrılırsa eski client'ın bağlantısı kapatılır.
+- **Tek dosyalık derleme** (`bun build --compile` vb.): adapter paketi dinamik `require` ile arandığı için pakete gömülmez. Adapter'ı uygulamada
+  statik import edip `adapterFactory` ile verin; bağlantı ayarları yine config'ten gelir:
+  `service.prisma.use(PrismaClient, { adapterFactory: ({ poolConfig }) => new PrismaMssql(poolConfig) })`. Aynı nedenle `cagd-log` için
+  `util.setLogger(log)` çağırın (logger da dinamik yüklenir).
 - `use()` çağırmazsan client, `config.data.database.prisma.clientPath` (varsayılan `@prisma/client`, göreli yollar çalışma dizinine göre) üzerinden yüklenir.
 - `service.database`, `service.prisma` için alias'tır.
 
@@ -483,13 +487,14 @@ import { util } from "cagd-utilities";
 const perms = util.redis.createCache({ namespace: "perm:global", ttlSec: 60 });
 const list = await perms.getOrLoad(userId, () => loadFromDb(userId)); // aynı anahtar için eşzamanlı yükleme tekilleştirilir
 await perms.del(userId); // izin değişince geçersiz kıl
+await perms.clear(); // namespace'in tamamı (SCAN + DEL; yönetimden "önbelleği boşalt" için)
 
 // Dağıtık kilit: SET NX PX + rastgele jeton; bırakma/uzatma yalnızca jeton eşleşirse (Lua).
 const lock = await util.redis.acquireLock("jobs:cleanup", { ttlMs: 30_000, waitMs: 0 });
 if (lock) try { await work(); await lock.extend(30_000); } finally { await lock.release(); }
 await util.redis.withLock("jobs:cleanup", { ttlMs: 30_000 }, async () => work()); // -> { acquired, result }
 
-// Pencerede bir kez: LastSeenAt'i dakikada bir yaz.
+// Pencerede bir kez: LastSeenAt'i dakikada bir yaz. Pencere kesirli saniye olabilir (SET NX PX).
 if (await util.redis.onceEvery(`gateway:lastseen:${id}`, 60)) await touchLastSeen(id);
 
 // Rate limit (sabit pencere, INCR + PEXPIRE atomik). Aşımda ApiError(429, "RATE_LIMITED") + Retry-After, RateLimit-* başlıkları.

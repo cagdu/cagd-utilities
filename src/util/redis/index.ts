@@ -25,21 +25,22 @@ export type { RedisCommandClient } from "./backend";
 const memoryFlags = new MemoryStore<true>(10_000);
 
 /**
- * Bir anahtar için pencere başına yalnızca ilk çağrıda `true` döner (`SET NX EX`).
+ * Bir anahtar için pencere başına yalnızca ilk çağrıda `true` döner (`SET NX PX`).
  * Örn. `LastSeenAt`'i dakikada bir yazmak: `if (await util.redis.onceEvery(\`gw:lastseen:${id}\`, 60)) await update();`
+ * `windowSec` kesirli olabilir (en az 1 ms).
  */
 export async function onceEvery(key: string, windowSec: number): Promise<boolean> {
 	const k = `once:${key}`;
-	const ttl = Math.max(1, Math.floor(windowSec));
+	const ttlMs = Math.max(1, Math.round(windowSec * 1000));
 	const client = getRedisClient();
 	if (client) {
 		try {
-			return (await client.sendCommand(["SET", k, "1", "EX", String(ttl), "NX"])) === "OK";
+			return (await client.sendCommand(["SET", k, "1", "PX", String(ttlMs), "NX"])) === "OK";
 		} catch (err) {
 			warnThrottled("onceEvery", "Redis erişilemedi, süreç içi bayrak kullanılıyor", err);
 		}
 	}
 	if (memoryFlags.get(k)) return false;
-	memoryFlags.set(k, true, ttl * 1000);
+	memoryFlags.set(k, true, ttlMs);
 	return true;
 }

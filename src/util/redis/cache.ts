@@ -26,6 +26,11 @@ export interface Cache {
 	 * Aynı anahtar için eşzamanlı çağrılar tek bir `loader()` çağrısını paylaşır (single-flight).
 	 */
 	getOrLoad<T>(key: string, loader: () => Promise<T> | T, ttlSec?: number): Promise<T>;
+	/**
+	 * Bu namespace'teki TÜM anahtarları siler (Redis'te `SCAN MATCH namespace:*` + `DEL`, süreç içi yedekte tamamı).
+	 * Silinen Redis anahtarı sayısını döner. Yönetimden "önbelleği boşalt" gibi seyrek işlemler içindir.
+	 */
+	clear(): Promise<number>;
 }
 
 /** Değer `{ v }` sarmalayıcısıyla saklanır; böylece `null` da önbelleğe alınabilir ve "yok"tan ayrılır. */
@@ -101,6 +106,27 @@ export function createCache(options: CacheOptions): Cache {
 			} catch (err) {
 				warnThrottled(`cache:${namespace}`, "Redis'ten silinemedi", err);
 			}
+		},
+
+		async clear(): Promise<number> {
+			memory.clear();
+			const client = getRedisClient();
+			if (!client) return 0;
+			// Glob özel karakterleri namespace'te geçerse kaçırılır (yalnızca bu namespace eşleşsin).
+			const pattern = `${namespace.replace(/[*?[\]\\]/g, ch => `\\${ch}`)}:*`;
+			let cursor = "0";
+			let deleted = 0;
+			try {
+				do {
+					const reply = (await client.sendCommand(["SCAN", cursor, "MATCH", pattern, "COUNT", "500"])) as [string, string[]];
+					cursor = String(reply[0]);
+					const keys = reply[1] ?? [];
+					if (keys.length > 0) deleted += Number(await client.sendCommand(["DEL", ...keys]));
+				} while (cursor !== "0");
+			} catch (err) {
+				warnThrottled(`cache:${namespace}`, "Redis'te önbellek temizlenemedi", err);
+			}
+			return deleted;
 		},
 
 		async getOrLoad<T>(key: string, loader: () => Promise<T> | T, ttlSec?: number): Promise<T> {

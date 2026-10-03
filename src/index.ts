@@ -49,7 +49,7 @@ export { log };
 export type { BaseConfig } from "./config/base-config";
 export type { ConfigFacade, ConfigManagerApi } from "./config";
 export type { ConfigChangeListener, ConfigEnvMap, ConfigInitOptions, ConfigSchema, DeepPartial, ResolvedConfig, UtilitiesConfig } from "./config/types";
-export type { BootstrapOptions, ServiceDefiner, ServiceName, ShutdownOptions } from "./service";
+export type { BootstrapOptions, JobContext, JobDefinition, JobSchedule, JobStatus, RunNowResult, ServiceDefiner, ServiceName, ShutdownOptions } from "./service";
 export type {
 	AxiosErrorCode,
 	AxiosServiceError,
