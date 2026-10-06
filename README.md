@@ -101,8 +101,8 @@ npm link cagd-utilities
 
 `link` ile bağlıyken Node, paketin içinden yapılan `require()` çağrılarını paketin **gerçek dizininden** yukarı doğru arar. Bu yüzden:
 
-- `@prisma/client`, `@prisma/adapter-*`, `cagd-log` ve `config.database.prisma.clientPath` **önce tüketici projenin dizininden** (`process.cwd()`) aranır; link ile de bulunur.
-- `pg`, `mssql`, `redis`, `express` gibi sürücüler paketin kendi dosyalarından import edildiği için link ile geliştirirken bu deponun `devDependencies`'inde kurulu olmaları gerekir (öyleler). Registry'den kurulumda bu sorun yoktur.
+- `pg`, `mssql`, `@prisma/client`, `@prisma/adapter-*`, `cagd-log` ve `config.database.prisma.clientPath` **önce tüketici projenin dizininden** (`process.cwd()`) aranır; link ile de bulunur.
+- `redis`, `express` gibi diğer paketler paketin kendi dosyalarından import edildiği için link ile geliştirirken bu deponun `devDependencies`'inde kurulu olmaları gerekir (öyleler). Registry'den kurulumda bu sorun yoktur.
 
 ---
 

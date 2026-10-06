@@ -145,7 +145,7 @@ export class PrismaService<TClient = any> {
 
 		if (!PrismaService.options.disableAdapter) {
 			const provider = PrismaService.getProvider();
-			const adapter = PrismaService.createAdapter();
+			const { adapter, loadError } = PrismaService.createAdapter();
 
 			if (!adapter) {
 				const pkg = provider === "mssql" ? "@prisma/adapter-mssql" : "@prisma/adapter-pg";
@@ -156,7 +156,9 @@ export class PrismaService<TClient = any> {
 					`PrismaService: '${pkg}' (ve '${driverPkg}') paketleri bulunamadı/yüklenemedi. ` +
 						`Kur: npm i ${pkg} ${driverPkg}. Adapter kullanmak istemiyorsan ` +
 						`service.prisma.use(PrismaClient, { disableAdapter: true }) ver ` +
-						`(Prisma 6 ve öncesinde schema.prisma'daki url kullanılır; Prisma 7'de clientOptions.accelerateUrl gerekir).`,
+						`(Prisma 6 ve öncesinde schema.prisma'daki url kullanılır; Prisma 7'de clientOptions.accelerateUrl gerekir). ` +
+						`Asıl hata: ${loadError?.message.split("\n")[0]}`,
+					{ cause: loadError },
 				);
 			}
 
@@ -183,17 +185,17 @@ export class PrismaService<TClient = any> {
 	}
 
 	/**
-	 * `null` dönüşü SADECE "paket yüklenemedi" (require başarısız) anlamına gelir.
+	 * `adapter: null` dönüşü SADECE "paket yüklenemedi" (require başarısız) anlamına gelir; `loadError` asıl require hatasıdır.
 	 * Paket yüklenip adapter KURULURKEN (constructor) fırlayan hata BİLEREK
 	 * yutulmuyor/`null`a çevrilmiyor — aksi halde "paketler kurulu ama yine de
 	 * 'bulunamadı' hatası alıyorum" gibi yanıltıcı bir teşhise yol açar. O hata,
 	 * gerçek sebebiyle (yanlış config şekli, sürüm uyuşmazlığı vs.) olduğu gibi
 	 * yukarı fırlatılır.
 	 */
-	private static createAdapter(): any | null {
+	private static createAdapter(): { adapter: any; loadError?: Error } {
 		const provider = PrismaService.getProvider();
 		const factory = PrismaService.options.adapterFactory;
-		if (factory) return factory({ provider, poolConfig: provider === "mssql" ? loadMssql().getPoolConfig() : loadPostgres().getPoolConfig() });
+		if (factory) return { adapter: factory({ provider, poolConfig: provider === "mssql" ? loadMssql().getPoolConfig() : loadPostgres().getPoolConfig() }) };
 
 		let AdapterCtor: new (poolConfig: any) => any;
 		let poolConfig: any;
@@ -208,10 +210,10 @@ export class PrismaService<TClient = any> {
 			}
 		} catch (err) {
 			log.debug("PrismaService: adapter paketi yüklenemedi.", (err as Error)?.message);
-			return null;
+			return { adapter: null, loadError: err instanceof Error ? err : new Error(String(err)) };
 		}
 
-		return new AdapterCtor(poolConfig);
+		return { adapter: new AdapterCtor(poolConfig) };
 	}
 
 	// ------------------------------------------------------------------

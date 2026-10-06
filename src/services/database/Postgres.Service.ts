@@ -1,8 +1,13 @@
-import { Pool, type PoolClient, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
+import type { Pool as PgPool, PoolClient, PoolConfig, QueryResult, QueryResultRow } from "pg";
 
 import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
+import { requireFromApp } from "../../util/require";
 import { BaseService } from "./Base.Service";
+
+// `npm link` / `file:` ile bağlı pakette normal `require("pg")` tüketici projedeki pg'yi bulamaz.
+const { Pool } = requireFromApp<typeof import("pg")>("pg");
+type Pool = PgPool;
 
 export class PostgresService extends BaseService<QueryResult> {
 	private static instance: PostgresService | null = null;
