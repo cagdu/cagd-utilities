@@ -8,6 +8,15 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 
 - `util.redis`: `setRedisClient(null)` ile süreç içi mod açıkça seçildiyse kilit "Redis bağlı değil" uyarısı loglanmaz (tek kopyalı kurulumlarda her dakika
   tekrarlanan gürültü). Yeni `isMemoryModeExplicit()`.
+- `PostgresService` / `MssqlService`: `pg` ve `mssql` artık Prisma adapter'ları gibi önce tüketici projenin dizininden (`process.cwd()`) yüklenir.
+  Paket `npm link` / `file:` ile bağlıyken, proje sürücüyü kurmuş olsa da alınan `Cannot find module 'pg'` hatası giderildi.
+- `PrismaService`: adapter yüklenemediğinde fırlatılan hata asıl `require` hatasını mesajda ve `cause` alanında taşır (eskiden yalnızca
+  "paketler bulunamadı" deniyordu; paketler kuruluyken yanıltıcıydı).
+
+### Düzeltilenler
+
+- `service.jobs`: tur zaman aşımı sayacı `unref()` edilmiyor. Süreci açık tutan başka bir şey yokken `runNow()`/tur hiç sonuçlanmıyordu (jobs testleri bu
+  yüzden kırmızıydı).
 
 ## [0.2.0] - 2026-10-03
 

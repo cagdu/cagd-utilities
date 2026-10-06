@@ -1,10 +1,14 @@
-import sql, { type ConnectionPool, type Request, type Transaction, type config as MssqlConfig } from "mssql";
+import type { ConnectionPool, IResult, Request, Transaction, config as MssqlConfig } from "mssql";
 
 import { baseCfg } from "../../config/access";
 import { log } from "../../util/logger";
+import { requireFromApp } from "../../util/require";
 import { BaseService } from "./Base.Service";
 
-export class MssqlService extends BaseService<sql.IResult<any>> {
+// `npm link` / `file:` ile bağlı pakette normal `require("mssql")` tüketici projedeki mssql'i bulamaz.
+const sql = requireFromApp<typeof import("mssql")>("mssql");
+
+export class MssqlService extends BaseService<IResult<any>> {
 	private static instance: MssqlService | null = null;
 	private static pool: ConnectionPool | null = null;
 	private static connecting: Promise<ConnectionPool> | null = null;
@@ -89,7 +93,7 @@ export class MssqlService extends BaseService<sql.IResult<any>> {
 	}
 
 	/** rowsAffected gibi meta bilgi de gerekiyorsa. */
-	async queryWithMeta<T extends Record<string, any> = any>(text: string, params?: any[]): Promise<sql.IResult<T>> {
+	async queryWithMeta<T extends Record<string, any> = any>(text: string, params?: any[]): Promise<IResult<T>> {
 		const pool = await this.getPool();
 		const request = pool.request();
 		this.bindParams(request, params);

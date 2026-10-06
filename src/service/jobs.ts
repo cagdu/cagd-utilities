@@ -338,7 +338,7 @@ export class JobRunner {
 					controller.abort(new Error(`service.jobs: "${def.name}" ${timeoutMs}ms içinde bitmedi`));
 					reject(new Error(`timeout after ${timeoutMs}ms`));
 				}, timeoutMs);
-				timer.unref?.();
+				// unref() EDİLMEZ: süren bir tur bitene (ya da zaman aşımına uğrayana) kadar süreç açık kalmalı.
 			});
 
 			let error: unknown = null;
