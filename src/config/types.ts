@@ -7,13 +7,13 @@
  * "declaration merging" ile doldurulur. Böylece `config.data.` yazdığında
  * IntelliSense senin kendi config objeni gösterir.
  *
- * Tüketici projede (örn. api/src/types/cagd-utilities.d.ts):
+ * Tüketici projede (örn. api/src/types/cagdu-utilities.d.ts):
  *
  *   import type { defaultConfig } from "../config";
  *
  *   type DefaultConfigType = typeof defaultConfig;
  *
- *   declare module "cagd-utilities" {
+ *   declare module "cagdu-utilities" {
  *       interface UtilitiesConfig extends DefaultConfigType {}
  *   }
  *

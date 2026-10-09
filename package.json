@@ -1,5 +1,5 @@
 {
-  "name": "cagd-utilities",
+  "name": "cagdu-utilities",
   "version": "0.2.0",
   "description": "API, Agent vb. servislerin ortak kullandığı config / database / web yardımcı katmanı",
   "keywords": [
@@ -18,12 +18,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cagdu/cagd-utilities.git"
+    "url": "git+https://github.com/cagdu/cagdu-utilities.git"
   },
   "bugs": {
-    "url": "https://github.com/cagdu/cagd-utilities/issues"
+    "url": "https://github.com/cagdu/cagdu-utilities/issues"
   },
-  "homepage": "https://github.com/cagdu/cagd-utilities#readme",
+  "homepage": "https://github.com/cagdu/cagdu-utilities#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

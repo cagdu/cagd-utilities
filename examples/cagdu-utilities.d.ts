@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  cagd-utilities İÇİN TİP GENİŞLETME (declaration merging)
+ *  cagdu-utilities İÇİN TİP GENİŞLETME (declaration merging)
  * ============================================================
  * Bu dosya, `index.ts`'in yanına KOPYALANMAK üzere yazıldı. Amacı:
  *
@@ -17,7 +17,7 @@ import type { defaultConfig } from "./index";
 
 type DefaultConfigType = typeof defaultConfig;
 
-declare module "cagd-utilities" {
+declare module "cagdu-utilities" {
 	interface UtilitiesConfig extends DefaultConfigType {}
 	interface RegisteredPrismaClient extends PrismaClient {}
 }

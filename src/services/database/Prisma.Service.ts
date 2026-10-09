@@ -53,10 +53,10 @@ export interface PrismaServiceOptions<TClient = any> {
  * çağrıldıktan sonra `.use()` DÖNÜŞÜNÜ ayrı bir değişkende tutmaya gerek kalmadan,
  * doğrudan `service.prisma.client.` üzerinde tam IntelliSense/autocomplete çalışır:
  *
- *   // src/types/cagd-utilities.d.ts
+ *   // src/types/cagdu-utilities.d.ts
  *   import type { PrismaClient } from "../prisma/generated/prisma/client";
  *
- *   declare module "cagd-utilities" {
+ *   declare module "cagdu-utilities" {
  *       interface RegisteredPrismaClient extends PrismaClient {}
  *   }
  */

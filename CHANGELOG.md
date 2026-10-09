@@ -6,6 +6,8 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/)'a dayanır. 0.x 
 
 ### Değişenler
 
+- **Paket adı `cagd-utilities` → `cagdu-utilities`** (eski npm hesabına erişim kalmadı). Tüketiciler bağımlılığı ve import yollarını
+  güncellemeli: `npm rm cagd-utilities && npm i cagdu-utilities`.
 - `util.redis`: `setRedisClient(null)` ile süreç içi mod açıkça seçildiyse kilit "Redis bağlı değil" uyarısı loglanmaz (tek kopyalı kurulumlarda her dakika
   tekrarlanan gürültü). Yeni `isMemoryModeExplicit()`.
 - `PostgresService` / `MssqlService`: `pg` ve `mssql` artık Prisma adapter'ları gibi önce tüketici projenin dizininden (`process.cwd()`) yüklenir.

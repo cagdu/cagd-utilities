@@ -19,10 +19,10 @@ export interface Logger {
 const LEVELS = ["info", "warn", "error", "debug"] as const;
 
 const consoleLogger: Logger = {
-	info: (...args) => console.log("[cagd-utilities]", ...args),
-	warn: (...args) => console.warn("[cagd-utilities]", ...args),
-	error: (...args) => console.error("[cagd-utilities]", ...args),
-	debug: (...args) => console.debug("[cagd-utilities]", ...args),
+	info: (...args) => console.log("[cagdu-utilities]", ...args),
+	warn: (...args) => console.warn("[cagdu-utilities]", ...args),
+	error: (...args) => console.error("[cagdu-utilities]", ...args),
+	debug: (...args) => console.debug("[cagdu-utilities]", ...args),
 };
 
 function resolveLogger(): Logger {

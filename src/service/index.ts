@@ -12,7 +12,7 @@
  *   .started        -> başarıyla başlatıldı mı
  *
  * Örnek:
- *   import { service, util } from "cagd-utilities";
+ *   import { service, util } from "cagdu-utilities";
  *
  *   service.prisma.use(PrismaClient);
  *   service.web.configure({ routers: [["/api", util.http.healthRouter()]] });
@@ -25,7 +25,7 @@ import { log } from "../util/logger";
 // SADECE TİPLER — bunlar derleme zamanında silinir, runtime'da hiçbir
 // require() tetiklemez. Gerçek sınıflar aşağıda ilgili getter'larda
 // `require()` ile İHTİYAÇ ANINDA yüklenir. Böylece örn. `mssql` paketini
-// hiç kurmayan bir proje sadece `import { service } from "cagd-utilities"`
+// hiç kurmayan bir proje sadece `import { service } from "cagdu-utilities"`
 // yazdığında hata almaz; `service.mssql`'e dokunmadıkça mssql hiç aranmaz.
 import type MssqlService from "../services/database/Mssql.Service";
 import type MailService from "../services/Mail.Service";

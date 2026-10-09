@@ -1,19 +1,19 @@
-# cagd-utilities
+# cagdu-utilities
 
-API, Agent vb. projelerin **ortak** kullandığı yardımcı katman: config, veritabanı, web sunucusu, HTTP istemcisi, mail, redis, API cevap standardı ve uygulama yaşam döngüsü. Tek yerden güncellenir, hepsi `npm update cagd-utilities` ile aynı sürümü alır.
+API, Agent vb. projelerin **ortak** kullandığı yardımcı katman: config, veritabanı, web sunucusu, HTTP istemcisi, mail, redis, API cevap standardı ve uygulama yaşam döngüsü. Tek yerden güncellenir, hepsi `npm update cagdu-utilities` ile aynı sürümü alır.
 
 ```ts
-import { config, service, services, util } from "cagd-utilities";
+import { config, service, services, util } from "cagdu-utilities";
 ```
 
 ## Hızlı bakış
 
 | Namespace  | Alt yol                   | Ne verir?                                                                          |
 | ---------- | ------------------------- | ---------------------------------------------------------------------------------- |
-| `config`   | `cagd-utilities/config`   | `config.data` (değerler) + `config.manager` (yönetim)                              |
-| `service`  | `cagd-utilities/service`  | **Hazır örnekler**: `service.prisma`, `service.web`, `service.redis`, `service.jobs`, `bootstrap`… |
-| `services` | `cagd-utilities/services` | **Ham sınıflar**: `PrismaService`, `WebService`, … (root'ta `classes` adıyla da)   |
-| `util`     | `cagd-utilities/util`     | `util.date`, `util.http` (cevap standardı, `ApiError`, `healthRouter`), `util.log` |
+| `config`   | `cagdu-utilities/config`   | `config.data` (değerler) + `config.manager` (yönetim)                              |
+| `service`  | `cagdu-utilities/service`  | **Hazır örnekler**: `service.prisma`, `service.web`, `service.redis`, `service.jobs`, `bootstrap`… |
+| `services` | `cagdu-utilities/services` | **Ham sınıflar**: `PrismaService`, `WebService`, … (root'ta `classes` adıyla da)   |
+| `util`     | `cagdu-utilities/util`     | `util.date`, `util.http` (cevap standardı, `ApiError`, `healthRouter`), `util.log` |
 
 **`service` mi `services` (`classes`) mı?**
 
@@ -26,7 +26,7 @@ import { config, service, services, util } from "cagd-utilities";
 
 ```ts
 // src/index.ts
-import { config, baseConfig, baseConfigSchema, service, util } from "cagd-utilities";
+import { config, baseConfig, baseConfigSchema, service, util } from "cagdu-utilities";
 import { PrismaClient } from "../prisma/generated/prisma/client";
 import { userRouter } from "./routers";
 
@@ -40,14 +40,14 @@ service.web.configure({ routers: [["/api", userRouter], ["/api", util.http.healt
 void service.bootstrap(["prisma", "redis", "web"]);
 ```
 
-Daha ayrıntılı, kopyalanmaya hazır örnek: [`examples/index.ts`](examples/index.ts) ve [`examples/cagd-utilities.d.ts`](examples/cagd-utilities.d.ts).
+Daha ayrıntılı, kopyalanmaya hazır örnek: [`examples/index.ts`](examples/index.ts) ve [`examples/cagdu-utilities.d.ts`](examples/cagdu-utilities.d.ts).
 
 ---
 
 ## Kurulum
 
 ```bash
-npm i cagd-utilities
+npm i cagdu-utilities
 ```
 
 Gereksinimler: **Node.js ≥ 20**, TypeScript kullanıyorsan **TypeScript ≥ 5.4**.
@@ -68,7 +68,7 @@ Sadece **kullandığın** servisin paketini kur. Gerisi opsiyonel:
 
 ### Paket yoksa ne olur?
 
-- Her sınıf kendi paketini **ihtiyaç anında** yükler. `import { service } from "cagd-utilities"` tek başına hiçbir opsiyonel paketi aramaz.
+- Her sınıf kendi paketini **ihtiyaç anında** yükler. `import { service } from "cagdu-utilities"` tek başına hiçbir opsiyonel paketi aramaz.
 - `service.mssql`'e dokunmadıysan `mssql` kurulu olmak zorunda değil. Diğerleri de aynı.
 - **Prisma** sadece seçili provider'ın adapter paketine bakar. Bulamazsa hangi paketleri kurman gerektiğini söyleyen net bir hata fırlatır. Adapter paketi bulunup constructor'ı başka bir sebeple patlarsa o hata **olduğu gibi** fırlatılır.
 - `disableAdapter: true`: adapter aranmaz, client sadece `clientOptions` ile oluşturulur. Prisma ≤ 6'da bağlantı `schema.prisma`'daki `url` ile kurulur; **Prisma 7'de adapter zorunludur**, adapter'sız kullanım sadece `clientOptions: { accelerateUrl }` ile mümkündür.
@@ -84,11 +84,11 @@ Sadece **kullandığın** servisin paketini kur. Gerisi opsiyonel:
 Paket CommonJS'tir; ESM'den sorunsuz import edilir:
 
 ```js
-import { config, service, classes } from "cagd-utilities"; // önerilen: servis paketleri ihtiyaç anında yüklenir
-import { RedisService } from "cagd-utilities/services"; // da çalışır
+import { config, service, classes } from "cagdu-utilities"; // önerilen: servis paketleri ihtiyaç anında yüklenir
+import { RedisService } from "cagdu-utilities/services"; // da çalışır
 ```
 
-> Not: ESM'de `cagd-utilities/services` alt yolundan **named import** yapıldığında Node, o modüldeki tüm export'ları import anında okur; yani kurulu olan tüm servis dosyaları hemen yüklenir (kurulu olmayanlar hata vermez, `undefined` olur). Tembel yükleme istiyorsan root'tan `classes`/`services` kullan.
+> Not: ESM'de `cagdu-utilities/services` alt yolundan **named import** yapıldığında Node, o modüldeki tüm export'ları import anında okur; yani kurulu olan tüm servis dosyaları hemen yüklenir (kurulu olmayanlar hata vermez, `undefined` olur). Tembel yükleme istiyorsan root'tan `classes`/`services` kullan.
 
 ### Yerel geliştirme (`npm link`)
 
@@ -96,7 +96,7 @@ import { RedisService } from "cagd-utilities/services"; // da çalışır
 # utilities deposunda
 npm run build && npm link
 # api ve agent projelerinde
-npm link cagd-utilities
+npm link cagdu-utilities
 ```
 
 `link` ile bağlıyken Node, paketin içinden yapılan `require()` çağrılarını paketin **gerçek dizininden** yukarı doğru arar. Bu yüzden:
@@ -132,7 +132,7 @@ Kural: `Xxx.Service.ts` dosyası `XxxService` sınıfını export eder.
 
 ```ts
 // src/config.ts
-import { config, baseConfig, baseConfigSchema } from "cagd-utilities";
+import { config, baseConfig, baseConfigSchema } from "cagdu-utilities";
 
 export const defaultConfig = {
 	...baseConfig, // database / services iskeleti ve TÜM varsayılan değerler
@@ -176,7 +176,7 @@ Değerler varsayılanın tipine dönüştürülür (`"8080"` → `8080`, `"true"
 Kendi alanların için env eklemek ya da env'i kapatmak:
 
 ```ts
-import { baseConfigEnv } from "cagd-utilities";
+import { baseConfigEnv } from "cagdu-utilities";
 
 config.manager.setDefaultConfig(defaultConfig, { env: { ...baseConfigEnv, "app.name": "APP_NAME" } });
 config.manager.setDefaultConfig(defaultConfig, { env: false }); // env okunmaz
@@ -192,7 +192,7 @@ config.manager.setDefaultConfig(defaultConfig, { env: false }); // env okunmaz
 ### Okuma / yazma
 
 ```ts
-import { config } from "cagd-utilities";
+import { config } from "cagdu-utilities";
 
 config.data.services.web.port; // değerler
 config.manager.setConfig({ dev: false }); // runtime güncelleme, reboot yok
@@ -226,12 +226,12 @@ config.manager.setConfig({ dev: false }, true); // true => config.jsonc dosyası
 Tüketici projede tek `.d.ts` yeterli:
 
 ```ts
-// src/types/cagd-utilities.d.ts
+// src/types/cagdu-utilities.d.ts
 import type { defaultConfig } from "../config";
 
 type DefaultConfigType = typeof defaultConfig;
 
-declare module "cagd-utilities" {
+declare module "cagdu-utilities" {
 	interface UtilitiesConfig extends DefaultConfigType {}
 }
 ```
@@ -274,7 +274,7 @@ service.handleSignals({ timeoutMs: 10000 }); // sadece kapanış yönetimi
 Generated `PrismaClient` senin projede üretildiği için dışarıdan verilir. Böylece tipler korunur.
 
 ```ts
-import { service } from "cagd-utilities";
+import { service } from "cagdu-utilities";
 import { PrismaClient } from "../prisma/generated/prisma/client";
 
 const prisma = service.prisma.use(PrismaClient); // tipli definer
@@ -296,10 +296,10 @@ await prisma.client.user.findMany(); // tam tipli
 > **Autocomplete:** `service.prisma.use(PrismaClient)`'ın dönüşünü yakalamadan `service.prisma.client` kullanmak istiyorsan bir kere `declare module` ile doldur:
 >
 > ```ts
-> // src/types/cagd-utilities.d.ts
+> // src/types/cagdu-utilities.d.ts
 > import type { PrismaClient } from "../prisma/generated/prisma/client";
 >
-> declare module "cagd-utilities" {
+> declare module "cagdu-utilities" {
 > 	interface RegisteredPrismaClient extends PrismaClient {}
 > }
 > ```
@@ -307,7 +307,7 @@ await prisma.client.user.findMany(); // tam tipli
 ### Web
 
 ```ts
-import { service, util } from "cagd-utilities";
+import { service, util } from "cagdu-utilities";
 
 service.web.configure({ routers: [["/api", r_main], ["/api", util.http.healthRouter()]] });
 await service.web.start();
@@ -367,7 +367,7 @@ await service.mail.send({ to: "a@b.com", subject: "Selam", text: "..." });
 Singleton'ı kendin yönetmek istediğinde:
 
 ```ts
-import { classes } from "cagd-utilities"; // = services
+import { classes } from "cagdu-utilities"; // = services
 
 const redis = classes.RedisService.getInstance();
 const http = new classes.AxiosService({ name: "Gateway", instance: { baseURL: "https://api.example.com", timeout: 5000 } });
@@ -402,7 +402,7 @@ await classes.PostgresService.getInstance().transaction(async client => {
 ## 4) util
 
 ```ts
-import { util } from "cagd-utilities";
+import { util } from "cagdu-utilities";
 
 util.date.getLocalISO(); // "2026-09-24T11:30:00.000+03:00" (ofsetli yerel saat)
 util.date.getLocalDay(); // "2026-09-24"
@@ -443,7 +443,7 @@ Express + Prisma örneği:
 
 ```ts
 import { z } from "zod";
-import { util } from "cagd-utilities";
+import { util } from "cagdu-utilities";
 
 const listSchema = util.list.createListQuerySchema(z, {
 	sorts: ["createdAt", "name"],
@@ -481,7 +481,7 @@ Varsayılan client `service.redis`'tir; yalnızca bağlıysa kullanılır (burad
 node-redis v4/v5/v6 ile çalışır. Farklı bir client için `util.redis.setRedisClient(client)` (`null` → her zaman süreç içi).
 
 ```ts
-import { util } from "cagd-utilities";
+import { util } from "cagdu-utilities";
 
 // Önbellek: JSON, anahtar `namespace:key`; `null` da önbelleğe alınabilir (yok = undefined).
 const perms = util.redis.createCache({ namespace: "perm:global", ttlSec: 60 });
@@ -531,7 +531,7 @@ CI (GitHub Actions) her push/PR'da Node 20/22/24 üzerinde Redis ve Postgres ser
 2. `npm run check`.
 3. `npm pack --dry-run` ile pakete ne gireceğine bak.
 4. `npm version patch|minor|major` -> `npm publish` (`prepublishOnly` tüm kontrolleri tekrar çalıştırır).
-5. `api` ve `agent` projelerinde `npm update cagd-utilities`.
+5. `api` ve `agent` projelerinde `npm update cagdu-utilities`.
 
 0.x sürümlerinde kırıcı değişiklikler **minor** artışla (0.1 → 0.2) yapılır ve CHANGELOG'da "Kırıcı" başlığı altında belirtilir.
 

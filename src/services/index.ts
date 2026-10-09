@@ -5,7 +5,7 @@
  * Sınıfların kendisi. Örnek oluşturma / yaşam döngüsü sende.
  * Hazır (kurulmuş) örnekler için `service` namespace'ini kullan.
  *
- *   import { services } from "cagd-utilities";
+ *   import { services } from "cagdu-utilities";
  *   const redis = services.RedisService.getInstance();
  *
  * KLASÖR YAPISI:
@@ -108,7 +108,7 @@ const lazy = {
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 // NOT: Aşağıdaki satırlar BİLEREK bu kalıpta yazıldı (sabit isim + `get: function () { return lazy.X; }`).
-// Node, ESM'den `import { RedisService } from "cagd-utilities/services"` yapıldığında CommonJS
+// Node, ESM'den `import { RedisService } from "cagdu-utilities/services"` yapıldığında CommonJS
 // export isimlerini statik analizle (cjs-module-lexer) bulur ve yalnızca bu kalıbı tanır.
 Object.defineProperty(exports, "AxiosService", {
 	enumerable: true,

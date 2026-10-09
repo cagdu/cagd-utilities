@@ -1,10 +1,10 @@
 /**
  * ============================================================
- *  cagd-utilities
+ *  cagdu-utilities
  * ============================================================
  * API, Agent vb. servislerin ortak kullandığı yardımcı katman.
  *
- *   import { config, service, services, util } from "cagd-utilities";
+ *   import { config, service, services, util } from "cagdu-utilities";
  *
  *   config.manager.setDefaultConfig(defaultConfig, { schema });
  *   config.data.services.web.port;          // değerler
@@ -18,7 +18,7 @@
  *   util.http.successResponse({ data });
  *
  * Her namespace alt yol (subpath) olarak da import edilebilir:
- *   import { prisma } from "cagd-utilities/service";
+ *   import { prisma } from "cagdu-utilities/service";
  */
 import { config } from "./config";
 import { baseConfig, baseConfigEnv, baseConfigSchema } from "./config/base-config";

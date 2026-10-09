@@ -22,7 +22,7 @@ function run(cwd, file) {
 /** Sadece dist + zorunlu bağımlılık (jsonc-parser) içeren izole bir tüketici projesi. */
 function isolatedProject() {
 	const dir = tmpDir("cagd-consumer-");
-	const pkgDir = path.join(dir, "node_modules", "cagd-utilities");
+	const pkgDir = path.join(dir, "node_modules", "cagdu-utilities");
 	fs.mkdirSync(pkgDir, { recursive: true });
 	fs.cpSync(path.join(ROOT, "dist"), path.join(pkgDir, "dist"), { recursive: true });
 	fs.copyFileSync(path.join(ROOT, "package.json"), path.join(pkgDir, "package.json"));
@@ -38,7 +38,7 @@ describe("opsiyonel paketler kurulu değilken", () => {
 		fs.writeFileSync(
 			path.join(dir, "cjs.js"),
 			`
-const u = require("cagd-utilities");
+const u = require("cagdu-utilities");
 u.util.setLogger({ info() {}, warn() {}, error() {}, debug() {} });
 u.config.manager.setDefaultConfig(u.baseConfig, { useFile: false });
 if (typeof u.service.bootstrap !== "function") throw new Error("bootstrap yok");
@@ -58,8 +58,8 @@ console.log("OK");
 		fs.writeFileSync(
 			path.join(dir, "esm.mjs"),
 			`
-import { config, service, util, baseConfig, classes } from "cagd-utilities";
-import { BaseService } from "cagd-utilities/services";
+import { config, service, util, baseConfig, classes } from "cagdu-utilities";
+import { BaseService } from "cagdu-utilities/services";
 util.setLogger({ info() {}, warn() {}, error() {}, debug() {} });
 config.manager.setDefaultConfig(baseConfig, { useFile: false });
 if (typeof service.start !== "function" || typeof BaseService !== "function" || typeof classes !== "object") throw new Error("export eksik");
@@ -70,14 +70,14 @@ console.log("OK");
 	});
 });
 
-test("ESM: 'cagd-utilities/services' alt yolundan named import (kurulu paketlerle)", () => {
+test("ESM: 'cagdu-utilities/services' alt yolundan named import (kurulu paketlerle)", () => {
 	// Paket kendi adıyla (self-reference) import edilebilir; bu repoda tüm opsiyonel paketler kurulu.
 	const dir = tmpDir();
 	const file = path.join(ROOT, "test", `.esm-named-${process.pid}.mjs`);
 	fs.writeFileSync(
 		file,
 		`
-import { RedisService, PostgresService, WebService, createExpressApp, AxiosServiceError } from "cagd-utilities/services";
+import { RedisService, PostgresService, WebService, createExpressApp, AxiosServiceError } from "cagdu-utilities/services";
 for (const [k, v] of Object.entries({ RedisService, PostgresService, WebService, createExpressApp, AxiosServiceError })) {
 	if (typeof v !== "function") throw new Error(k + " yok");
 }
@@ -100,7 +100,7 @@ test("tipler: skipLibCheck=false tüketici projede ve örnek projede derlenir", 
 
 	// Örnek proje (examples/) birebir kopyalanır; generated Prisma client'ı taklit eden bir tip dosyası eklenir.
 	fs.copyFileSync(path.join(ROOT, "examples", "index.ts"), path.join(dir, "src", "index.ts"));
-	fs.copyFileSync(path.join(ROOT, "examples", "cagd-utilities.d.ts"), path.join(dir, "src", "cagd-utilities.d.ts"));
+	fs.copyFileSync(path.join(ROOT, "examples", "cagdu-utilities.d.ts"), path.join(dir, "src", "cagdu-utilities.d.ts"));
 	fs.writeFileSync(
 		path.join(dir, "prisma", "generated", "prisma", "client.ts"),
 		`
@@ -116,8 +116,8 @@ export class PrismaClient {
 	fs.writeFileSync(
 		path.join(dir, "src", "extra.ts"),
 		`
-import { config, service, services, util, type ServiceName, type AxiosServiceError } from "cagd-utilities";
-import { RedisService } from "cagd-utilities/services";
+import { config, service, services, util, type ServiceName, type AxiosServiceError } from "cagdu-utilities";
+import { RedisService } from "cagdu-utilities/services";
 import { cfg } from "./index";
 
 const port: number = config.data.services.web.port;
@@ -148,8 +148,8 @@ export { port, appName, provider, names, redis, handle, err };
 				typeRoots: [path.join(ROOT, "node_modules", "@types")],
 				baseUrl: ".",
 				paths: {
-					"cagd-utilities": [path.join(ROOT, "dist", "index.d.ts")],
-					"cagd-utilities/*": [path.join(ROOT, "dist", "*", "index.d.ts")],
+					"cagdu-utilities": [path.join(ROOT, "dist", "index.d.ts")],
+					"cagdu-utilities/*": [path.join(ROOT, "dist", "*", "index.d.ts")],
 				},
 			},
 			include: ["src/**/*.ts", "prisma/**/*.ts"],

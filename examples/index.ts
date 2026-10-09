@@ -2,7 +2,7 @@
  * ============================================================
  *  ÖRNEK GİRİŞ NOKTASI (index.ts)
  * ============================================================
- * Bu dosya cagd-utilities'i KULLANAN bir projenin (api/agent vb.)
+ * Bu dosya cagdu-utilities'i KULLANAN bir projenin (api/agent vb.)
  * `src/index.ts` dosyası olarak birebir kopyalanmak üzere yazıldı.
  * Bu repoda (veritabanı/redis sunucusu ve generated Prisma client
  * olmadığı için) doğrudan çalışmaz — hedefi budur. Tip kontrolü
@@ -16,7 +16,7 @@
  *                   kapatıp süreci exit code 1 ile sonlandırır. SIGTERM/SIGINT
  *                   ve beklenmeyen hatalarda düzgün kapanışı da kurar.
  *
- * Yanındaki `cagd-utilities.d.ts` dosyasını da kopyala: `config.data`/`cfg`
+ * Yanındaki `cagdu-utilities.d.ts` dosyasını da kopyala: `config.data`/`cfg`
  * ve `service.prisma.client`'ın (use() dönüşünü ayrı tutmadan, HER YERDE)
  * tam tipli/autocomplete'li olması için gerekli.
  */
@@ -24,7 +24,7 @@ import express, { type Router } from "express";
 // Gerçek projede: `npx prisma generate` sonrası oluşan generated client.
 import { PrismaClient } from "../prisma/generated/prisma/client";
 
-import { baseConfig, baseConfigSchema, config, log, service, util } from "cagd-utilities";
+import { baseConfig, baseConfigSchema, config, log, service, util } from "cagdu-utilities";
 
 const { ApiError } = util.http;
 

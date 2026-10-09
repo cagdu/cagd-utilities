@@ -5,7 +5,7 @@ import type { ConfigEnvMap, ConfigSchema } from "./types";
  * TEMEL config iskeleti ve TÜM varsayılan değerlerin TEK kaynağı. Servisler kendi
  * içlerinde ayrıca varsayılan değer tutmaz. Tüketici proje kendi alanlarını ekler:
  *
- *   import { config, baseConfig, baseConfigSchema } from "cagd-utilities";
+ *   import { config, baseConfig, baseConfigSchema } from "cagdu-utilities";
  *
  *   const defaultConfig = {
  *       ...baseConfig,
